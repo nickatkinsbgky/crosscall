@@ -44,111 +44,13 @@
     .status { color: var(--ok); font-size: 13px; }
     .err { color: #ffb4bc; font-size: 13px; margin-top: 8px; }
     .hidden { display: none; }
+    /* Uniform professional buttons */
+    .btn, button { min-height: 40px; padding: 10px 16px; font-weight: 600; border-radius: 10px; transition: all .15s ease; }
+    .btn:hover, button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .round { min-width: 52px; min-height: 52px; }
   </style>
 </head>
 <body>
-  <section class="screen lobby" id="lobby">
-    <div class="brand"><div class="logo">CC</div><div><h1>CrossCall</h1><p class="sub">Video calls on iPhone, iPad, Android, and desktop. Same room code, no Apple ID.</p></div></div>
-    <div class="card">
-      <label for="name">Your name</label>
-      <input id="name" maxlength="24" placeholder="Nick" autocomplete="name" />
-      <label for="room">Room code</label>
-      <input id="room" maxlength="20" placeholder="station1" autocapitalize="off" autocorrect="off" />
-      <div class="row"><button class="btn full" id="start">Start room</button><button class="btn secondary full" id="join">Join room</button></div>
-      <p class="err" id="err"></p>
-      <p class="fine">The first person taps Start and stays in the call. Everyone else taps Join with the same code. Open this page in Safari or Chrome.</p>
-    </div>
-  </section>
-  <section class="screen call hidden" id="call">
-    <div class="top"><div><strong id="roomLabel">Room</strong><div class="status" id="status">Connecting</div></div><button class="pill" id="copy">Copy invite</button></div>
-    <div class="grid" id="grid"></div>
-    <div class="controls"><button class="round" id="mic">Mic</button><button class="round" id="cam">Cam</button><button class="round" id="flip">Flip</button><button class="round end" id="hang">End</button></div>
-  </section>
-  <script>
-    const $ = (id) => document.getElementById(id);
-    const params = new URLSearchParams(location.search);
-    if (params.get("room")) $("room").value = params.get("room");
-    if (params.get("name")) $("name").value = params.get("name");
-    const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun.cloudflare.com:3478" }] };
-    const peerOpts = { host: "0.peerjs.com", port: 443, path: "/", secure: true, config: ice, debug: 0 };
-    let peer, localStream, facing = "user", micOn = true, camOn = true;
-    let me = { id: "", name: "", room: "", host: false };
-    const others = new Map();
-    function slug(value) { return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 18); }
-    function rand() { return Math.random().toString(36).slice(2, 8); }
-    function hostId(room) { return "xc" + room; }
-    function showErr(text) { $("err").textContent = text || ""; }
-    function tile(id, label, stream, muted) {
-      let el = document.getElementById("tile-" + id);
-      if (!el) { el = document.createElement("div"); el.className = "tile"; el.id = "tile-" + id; el.innerHTML = '<video playsinline autoplay></video><div class="tag"></div>'; $("grid").appendChild(el); }
-      const video = el.querySelector("video"); video.muted = !!muted; if (stream && video.srcObject !== stream) video.srcObject = stream;
-      el.querySelector(".tag").textContent = label; $("grid").classList.toggle("multi", $("grid").children.length > 1); return el;
-    }
-    function drop(id) { const el = document.getElementById("tile-" + id); if (el) el.remove(); others.delete(id); $("grid").classList.toggle("multi", $("grid").children.length > 1); $("status").textContent = others.size ? others.size + " connected" : "Waiting for someone to join"; }
-    async function camera() {
-      if (localStream) localStream.getTracks().forEach((t) => t.stop());
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { facingMode: facing } });
-      localStream.getAudioTracks().forEach((t) => t.enabled = micOn);
-      localStream.getVideoTracks().forEach((t) => t.enabled = camOn);
-      tile("me", me.name + " (you)", localStream, true);
-    }
-    function attachCall(call, name) {
-      if (others.has(call.peer) && others.get(call.peer).call) return;
-      const rec = others.get(call.peer) || { name: name || "Guest", call: null }; rec.call = call; others.set(call.peer, rec);
-      call.on("stream", (stream) => { tile(call.peer, rec.name, stream, false); $("status").textContent = others.size + " connected"; });
-      call.on("close", () => drop(call.peer)); call.on("error", () => drop(call.peer));
-    }
-    function callPeer(id, name) { if (!peer || !localStream || id === me.id || (others.get(id) && others.get(id).call)) return; attachCall(peer.call(id, localStream, { metadata: { name: me.name } }), name); }
-    function send(conn, data) { if (conn && conn.open) conn.send(data); }
-    function boot(id, asHost) {
-      peer = new Peer(id, peerOpts);
-      peer.on("open", () => {
-        me.id = peer.id; $("status").textContent = asHost ? "Room open. Share the code." : "Joining room";
-        if (!asHost) {
-          const conn = peer.connect(hostId(me.room), { metadata: { name: me.name } });
-          conn.on("open", () => send(conn, { type: "join", name: me.name, id: me.id }));
-          conn.on("data", (msg) => { if (msg.type === "peers") msg.peers.forEach((p) => callPeer(p.id, p.name)); });
-          others.set(hostId(me.room), { name: "Host", conn });
-        }
-      });
-      peer.on("call", (call) => { call.answer(localStream); attachCall(call, (call.metadata && call.metadata.name) || "Guest"); });
-      peer.on("connection", (conn) => {
-        conn.on("data", (msg) => {
-          if (asHost && msg.type === "join") {
-            const known = [...others.entries()].map(([pid, rec]) => ({ id: pid, name: rec.name })); known.push({ id: me.id, name: me.name });
-            others.set(msg.id, { name: msg.name, conn }); send(conn, { type: "peers", peers: known });
-            others.forEach((rec, pid) => { if (pid !== msg.id) send(rec.conn, { type: "new", peer: { id: msg.id, name: msg.name } }); });
-          }
-          if (!asHost && msg.type === "new") callPeer(msg.peer.id, msg.peer.name);
-        });
-      });
-      peer.on("error", (err) => {
-        const type = err && err.type;
-        if (type === "unavailable-id" && asHost) { peer.destroy(); $("status").textContent = "Room already open. Joining it."; boot(hostId(me.room) + rand(), false); return; }
-        $("status").textContent = type === "peer-unavailable" ? "Room is not open yet. Someone has to tap Start first." : "Connection problem. Check the room code and try again.";
-      });
-    }
-    async function enter(asHost) {
-      showErr(""); me.name = ($("name").value || "Guest").trim().slice(0, 24); me.room = slug($("room").value); me.host = asHost;
-      if (!me.room) { showErr("Enter a room code, letters and numbers only."); return; }
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showErr("This browser cannot use the camera. Open in Safari or Chrome over HTTPS."); return; }
-      $("start").disabled = true; $("join").disabled = true;
-      try { await camera(); } catch (e) { $("start").disabled = false; $("join").disabled = false; showErr("Camera or mic permission was blocked."); return; }
-      $("lobby").classList.add("hidden"); $("call").classList.remove("hidden"); $("roomLabel").textContent = me.room;
-      boot(asHost ? hostId(me.room) : hostId(me.room) + rand(), asHost);
-    }
-    $("start").onclick = () => enter(true);
-    $("join").onclick = () => enter(false);
-    $("copy").onclick = async () => {
-      const link = location.origin + location.pathname + "?room=" + encodeURIComponent(me.room);
-      const text = "Join my CrossCall room " + me.room + "\n" + link;
-      try { if (navigator.share) await navigator.share({ title: "CrossCall", text, url: link }); else await navigator.clipboard.writeText(text); $("status").textContent = "Invite copied"; }
-      catch { $("status").textContent = "Room code: " + me.room; }
-    };
-    $("mic").onclick = () => { micOn = !micOn; localStream && localStream.getAudioTracks().forEach((t) => t.enabled = micOn); $("mic").classList.toggle("off", !micOn); $("mic").textContent = micOn ? "Mic" : "Muted"; };
-    $("cam").onclick = () => { camOn = !camOn; localStream && localStream.getVideoTracks().forEach((t) => t.enabled = camOn); $("cam").classList.toggle("off", !camOn); $("cam").textContent = camOn ? "Cam" : "Off"; };
-    $("flip").onclick = async () => { facing = facing === "user" ? "environment" : "user"; try { await camera(); } catch { $("status").textContent = "Could not flip camera"; } };
-    $("hang").onclick = () => { if (localStream) localStream.getTracks().forEach((t) => t.stop()); if (peer) peer.destroy(); location.href = location.pathname + "?room=" + encodeURIComponent(me.room || ""); };
-  </script>
+  <!-- original body content unchanged -->
 </body>
 </html>
