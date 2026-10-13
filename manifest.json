@@ -1,6 +1,6 @@
 {
-  "name": "CrossCall",
-  "short_name": "CrossCall",
+  "name": "HelloDarlin'",
+  "short_name": "HelloDarlin'",
   "description": "Video calls between iPhone, iPad, Android, and desktop.",
   "start_url": "./index.html",
   "scope": "./",
