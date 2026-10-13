@@ -46,8 +46,6 @@
     .video-stage { position: absolute; inset: 0; background: linear-gradient(135deg, #1a0a2e 0%, #0c1220 40%, #1a2744 100%); display: grid; overflow: hidden; }
     .video-stage::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 30%, rgba(255,105,180,.15), transparent 40%), radial-gradient(circle at 80% 70%, rgba(61,126,255,.2), transparent 45%); animation: glow 6s ease-in-out infinite alternate; pointer-events: none; }
     @keyframes glow { 0% { opacity: .6; } 100% { opacity: 1; } }
-    .floating-emoji { position: absolute; font-size: 28px; animation: floatAround 8s linear infinite; opacity: .4; pointer-events: none; z-index: 5; }
-    @keyframes floatAround { 0% { transform: translateY(100vh) rotate(0deg); } 100% { transform: translateY(-20vh) rotate(360deg); } }
     .video-stage.solo { grid-template-columns: 1fr; }
     .video-stage.group { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 6px; padding: 70px 8px 90px; }
     .video-stage.group.three { grid-template-columns: 1fr 1fr; }
@@ -71,11 +69,15 @@
     .waiting-fun .msg { margin-top: 16px; font-size: 20px; font-weight: 700; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
     .waiting-fun .submsg { font-size: 14px; color: #a0b0c8; margin-top: 6px; }
     
-    .favorites-bar { position: absolute; top: 108px; left: 12px; right: 12px; z-index: 21; display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; }
-    .fav-chip { background: rgba(18,32,51,.85); backdrop-filter: blur(10px); border: 1px solid rgba(61,126,255,.35); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #e8f0ff; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .favorites-bar { position: absolute; bottom: calc(100px + var(--safe-bottom)); left: 12px; right: 12px; z-index: 21; display: flex; flex-direction: column; gap: 8px; }
+    .fav-row-chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; }
+    .fav-chip { background: rgba(18,32,51,.85); backdrop-filter: blur(10px); border: 2px solid rgba(61,126,255,.6); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #e8f0ff; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 6px; }
     .fav-chip:active { transform: scale(0.96); }
     .fav-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: #3dd68c; }
-    .fav-edit-btn { background: rgba(61,126,255,.25); border: 1px solid rgba(61,126,255,.5); border-radius: 999px; padding: 8px 12px; font-size: 13px; color: #fff; cursor: pointer; }
+    .fav-actions { display: flex; gap: 12px; }
+    .fav-edit-btn, .contacts-btn { background: #3d7eff; border: 3px solid #fff; border-radius: 14px; padding: 16px 12px; font-size: 17px; font-weight: 800; color: #fff; cursor: pointer; flex: 1; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,.4); letter-spacing: .02em; }
+    .fav-edit-btn:active, .contacts-btn:active { transform: scale(0.96); }
+    .contacts-btn { background: #ff5d6c; border-color: #fff; }
     .fav-modal { position: fixed; inset: 0; z-index: 200; background: rgba(8,12,22,.92); display: flex; flex-direction: column; padding: calc(20px + var(--safe-top)) 16px calc(20px + var(--safe-bottom)); }
     .fav-modal h3 { margin: 0 0 12px; font-size: 20px; }
     .fav-list { flex: 1; overflow-y: auto; }
@@ -133,11 +135,6 @@
 
   <div id="callScreen" class="call hidden">
     <div class="video-stage solo" id="videoStage">
-      <div class="floating-emoji" style="left:10%;animation-delay:0s;">💖</div>
-      <div class="floating-emoji" style="left:30%;animation-delay:2s;">🎥</div>
-      <div class="floating-emoji" style="left:55%;animation-delay:4s;">✨</div>
-      <div class="floating-emoji" style="left:75%;animation-delay:1s;">💕</div>
-      <div class="floating-emoji" style="left:90%;animation-delay:3s;">😊</div>
       <div class="waiting-fun" id="waitingFun" style="display:none;">
         <div class="hearts">💖🎥</div>
         <div class="msg">Waiting for your darlin'…</div>
@@ -612,18 +609,34 @@
       if (!bar) return;
       const favs = loadFavorites();
       bar.innerHTML = '';
-      favs.forEach((f, i) => {
-        const chip = document.createElement('div');
-        chip.className = 'fav-chip';
-        chip.innerHTML = '<span class="dot"></span>' + (f.name || 'Contact');
-        chip.onclick = () => callFavorite(f);
-        bar.appendChild(chip);
-      });
+      if (favs.length) {
+        const chips = document.createElement('div');
+        chips.className = 'fav-row-chips';
+        favs.forEach((f, i) => {
+          const chip = document.createElement('div');
+          chip.className = 'fav-chip';
+          chip.innerHTML = '<span class="dot"></span>' + (f.name || 'Contact');
+          chip.onclick = () => callFavorite(f);
+          chips.appendChild(chip);
+        });
+        bar.appendChild(chips);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'fav-actions';
       const edit = document.createElement('button');
       edit.className = 'fav-edit-btn';
-      edit.textContent = favs.length ? 'Edit' : '+ Favorites';
+      edit.textContent = favs.length ? 'Favorites' : '+ Favorites';
       edit.onclick = openFavModal;
-      bar.appendChild(edit);
+      actions.appendChild(edit);
+      const contacts = document.createElement('button');
+      contacts.className = 'contacts-btn';
+      contacts.textContent = 'Contacts';
+      contacts.onclick = () => {
+        if (typeof Android !== 'undefined' && Android.pickContact) Android.pickContact();
+        else alert('Contacts not available');
+      };
+      actions.appendChild(contacts);
+      bar.appendChild(actions);
     }
     function callFavorite(fav) {
       // Start a dedicated room for this contact and show invite
