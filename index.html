@@ -11,7 +11,10 @@
   <link rel="manifest" href="manifest.json" />
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <style>
+    .hidden { display: none !important; }
+
     :root {
+    .hidden { display: none !important; }
       --bg: #0c1220; --card: #161e2e; --line: #2a3650; --text: #f4f7fb;
       --muted: #9aa8be; --blue: #3d7eff; --danger: #ff5d6c; --ok: #3dd68c;
       --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -155,13 +158,14 @@
     
     window.closeFavModal = function() {
       const m = document.getElementById('favModal');
-      if (m) m.classList.add('hidden');
-      // Make sure call screen is visible
+      if (m) {
+        m.classList.add('hidden');
+        m.style.display = 'none';
+      }
       const call = document.getElementById('callScreen');
       const lobby = document.getElementById('lobby');
-      if (call) call.classList.remove('hidden');
+      if (call) { call.classList.remove('hidden'); call.style.display = ''; }
       if (lobby) lobby.classList.add('hidden');
-      // Refresh favorites bar
       if (typeof renderFavorites === 'function') renderFavorites();
     };
     window.addFavorite = async function() {
