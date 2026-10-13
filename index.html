@@ -39,36 +39,32 @@
     .call { display: flex; flex-direction: column; min-height: 100dvh; padding-bottom: var(--safe-bottom); position: relative; }
     .top { display: flex; justify-content: space-between; align-items: center; padding: calc(14px + var(--safe-top)) 14px 8px; gap: 8px; position: absolute; top: 0; left: 0; right: 0; z-index: 20; background: linear-gradient(to bottom, rgba(12,18,32,.7), transparent); }
     .pill { background: rgba(18,32,51,.8); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-    .video-stage { position: absolute; inset: 0; background: #000; display: grid; }
+    
+    .video-stage { position: absolute; inset: 0; background: linear-gradient(180deg, #0a0e1a 0%, #121a2e 50%, #0c1220 100%); display: grid; }
     .video-stage.solo { grid-template-columns: 1fr; }
-    .video-stage.group { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 4px; padding: 60px 4px 80px; }
+    .video-stage.group { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 6px; padding: 70px 8px 90px; }
     .video-stage.group.three { grid-template-columns: 1fr 1fr; }
-    .remote-tile { position: relative; background: #10192b; border-radius: 8px; overflow: hidden; min-height: 0; }
+    .remote-tile { position: relative; background: linear-gradient(145deg, #1a2744, #0f1728); border-radius: 16px; overflow: hidden; min-height: 0; box-shadow: 0 4px 20px rgba(0,0,0,.4); border: 1px solid rgba(61,126,255,.15); }
     .remote-tile video { width: 100%; height: 100%; object-fit: cover; background: #0b1220; }
-    .video-stage.solo .remote-tile { position: absolute; inset: 0; border-radius: 0; }
-    .local-tile { position: absolute; right: 12px; bottom: calc(90px + var(--safe-bottom)); width: 110px; height: 150px; z-index: 15; border-radius: 14px; border: 2px solid rgba(255,255,255,.3); overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.4); cursor: pointer; }
+    .video-stage.solo .remote-tile { position: absolute; inset: 0; border-radius: 0; border: none; box-shadow: none; }
+    .local-tile { position: absolute; right: 14px; bottom: calc(96px + var(--safe-bottom)); width: 112px; height: 152px; z-index: 15; border-radius: 18px; border: 3px solid rgba(61,126,255,.6); overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.1); cursor: pointer; background: #10192b; }
     @media (min-width: 600px) { .local-tile { width: 140px; height: 190px; } }
     .local-tile video { width: 100%; height: 100%; object-fit: cover; }
-    .tag { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.6); border-radius: 999px; padding: 5px 10px; font-size: 13px; font-weight: 600; }
-    .controls { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 12px; padding: 8px 12px calc(16px + var(--safe-bottom)); background: linear-gradient(to top, rgba(12,18,32,.9), transparent); z-index: 20; }
-    .round { width: 56px; height: 56px; border-radius: 50%; border: 0; background: #1b2740; color: white; font-size: 14px; font-weight: 700; display: grid; place-items: center; cursor: pointer; }
+    .tag { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.55); backdrop-filter: blur(8px); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; color: #fff; }
+    .controls { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 16px; padding: 12px 16px calc(18px + var(--safe-bottom)); background: linear-gradient(to top, rgba(10,14,26,.95), transparent); z-index: 20; }
+    .round { width: 58px; height: 58px; border-radius: 50%; border: 0; background: linear-gradient(160deg, #2a3a5c, #1b2740); color: white; font-size: 13px; font-weight: 700; display: grid; place-items: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.3); transition: transform .1s; }
     .round:active { transform: scale(0.94); }
-    .round.off { background: #3a2a2e; color: #ffb4bc; }
-    .round.end { background: var(--danger); color: #2a0b10; width: 64px; height: 64px; }
-    .status { color: var(--ok); font-size: 13px; }
-    .err { color: #ffb4bc; font-size: 13px; margin-top: 8px; }
-    .hidden { display: none !important; }
-    .incoming { position: fixed; inset: 0; z-index: 100; background: rgba(8, 12, 22, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(24px + var(--safe-top)) 20px calc(24px + var(--safe-bottom)); text-align: center; }
-    .incoming h2 { margin: 0 0 6px; font-size: 26px; }
-    .incoming .caller { font-size: 18px; color: var(--muted); margin-bottom: 28px; }
-    .incoming .actions { display: flex; gap: 24px; }
-    .incoming .round { width: 72px; height: 72px; font-size: 15px; }
-    .incoming .accept { background: var(--ok); color: #0a1f14; }
-    .incoming .decline { background: var(--danger); color: #2a0b10; }
-    .pulse { animation: pulse 1.4s ease-in-out infinite; }
-    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.85; } }
-    .invite-bar { margin-top: 10px; padding: 10px 12px; background: rgba(15,23,40,.9); border: 1px solid var(--line); border-radius: 12px; font-size: 13px; display: flex; align-items: center; gap: 8px; position: absolute; top: 60px; left: 12px; right: 12px; z-index: 20; }
-    .invite-bar code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .round.off { background: linear-gradient(160deg, #4a3038, #3a2a2e); color: #ffb4bc; }
+    .round.end { background: linear-gradient(160deg, #ff6b7a, #ff5d6c); color: #2a0b10; width: 66px; height: 66px; }
+    .top { display: flex; justify-content: space-between; align-items: center; padding: calc(14px + var(--safe-top)) 14px 8px; gap: 8px; position: absolute; top: 0; left: 0; right: 0; z-index: 20; background: linear-gradient(to bottom, rgba(10,14,26,.8), transparent); }
+    .pill { background: rgba(18,32,51,.75); backdrop-filter: blur(10px); border: 1px solid rgba(61,126,255,.25); border-radius: 999px; padding: 6px 14px; font-size: 13px; color: #c8d4e8; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    .status { color: #5ee0a0; font-size: 13px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,.4); }
+    .waiting-fun { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; pointer-events: none; background: radial-gradient(circle at 50% 40%, rgba(61,126,255,.12), transparent 60%); }
+    .waiting-fun .hearts { font-size: 56px; animation: float 3s ease-in-out infinite; filter: drop-shadow(0 4px 12px rgba(0,0,0,.4)); }
+    .waiting-fun .msg { margin-top: 16px; font-size: 20px; font-weight: 700; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+    .waiting-fun .submsg { font-size: 14px; color: #a0b0c8; margin-top: 6px; }
+    .invite-bar { margin-top: 10px; padding: 12px 14px; background: rgba(15,23,40,.85); backdrop-filter: blur(12px); border: 1px solid rgba(61,126,255,.3); border-radius: 16px; font-size: 13px; display: flex; align-items: center; gap: 8px; position: absolute; top: 58px; left: 12px; right: 12px; z-index: 20; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+
     .copy-link-btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
 
     .waiting-fun { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; pointer-events: none; }
