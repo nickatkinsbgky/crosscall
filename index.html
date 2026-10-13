@@ -63,6 +63,21 @@
     .waiting-fun .hearts { font-size: 56px; animation: float 3s ease-in-out infinite; filter: drop-shadow(0 4px 12px rgba(0,0,0,.4)); }
     .waiting-fun .msg { margin-top: 16px; font-size: 20px; font-weight: 700; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
     .waiting-fun .submsg { font-size: 14px; color: #a0b0c8; margin-top: 6px; }
+    
+    .favorites-bar { position: absolute; top: 108px; left: 12px; right: 12px; z-index: 21; display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; }
+    .fav-chip { background: rgba(18,32,51,.85); backdrop-filter: blur(10px); border: 1px solid rgba(61,126,255,.35); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #e8f0ff; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .fav-chip:active { transform: scale(0.96); }
+    .fav-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: #3dd68c; }
+    .fav-edit-btn { background: rgba(61,126,255,.25); border: 1px solid rgba(61,126,255,.5); border-radius: 999px; padding: 8px 12px; font-size: 13px; color: #fff; cursor: pointer; }
+    .fav-modal { position: fixed; inset: 0; z-index: 200; background: rgba(8,12,22,.92); display: flex; flex-direction: column; padding: calc(20px + var(--safe-top)) 16px calc(20px + var(--safe-bottom)); }
+    .fav-modal h3 { margin: 0 0 12px; font-size: 20px; }
+    .fav-list { flex: 1; overflow-y: auto; }
+    .fav-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+    .fav-row input { flex: 1; background: #0f1728; border: 1px solid #2a3650; border-radius: 10px; padding: 10px; font-size: 15px; }
+    .fav-row button { background: #ff5d6c; color: #fff; border: 0; border-radius: 10px; padding: 10px 12px; font-weight: 700; }
+    .fav-add { background: #3d7eff; color: #fff; border: 0; border-radius: 12px; padding: 12px; font-weight: 700; width: 100%; margin-top: 8px; }
+    .fav-close { background: #1b2740; color: #fff; border: 0; border-radius: 12px; padding: 12px; font-weight: 700; width: 100%; margin-top: 8px; }
+
     .invite-bar { margin-top: 10px; padding: 12px 14px; background: rgba(15,23,40,.85); backdrop-filter: blur(12px); border: 1px solid rgba(61,126,255,.3); border-radius: 16px; font-size: 13px; display: flex; align-items: center; gap: 8px; position: absolute; top: 58px; left: 12px; right: 12px; z-index: 20; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
 
     .copy-link-btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
@@ -117,6 +132,7 @@
         <div class="submsg">Share the link above</div>
       </div>
     </div>
+    <div class="favorites-bar" id="favoritesBar"></div>
     <div class="top">
       <div class="pill" id="roomPill">Room: —</div>
       <div class="status" id="status">Connecting…</div>
@@ -535,6 +551,103 @@
       }
     })();
 
+    
+    // --- Favorites ---
+    const FAV_KEY = 'hellodarlin-favorites';
+    function loadFavorites() {
+      try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function saveFavorites(list) {
+      localStorage.setItem(FAV_KEY, JSON.stringify(list.slice(0, 5)));
+    }
+    function renderFavorites() {
+      const bar = document.getElementById('favoritesBar');
+      if (!bar) return;
+      const favs = loadFavorites();
+      bar.innerHTML = '';
+      favs.forEach((f, i) => {
+        const chip = document.createElement('div');
+        chip.className = 'fav-chip';
+        chip.innerHTML = '<span class="dot"></span>' + (f.name || 'Contact');
+        chip.onclick = () => callFavorite(f);
+        bar.appendChild(chip);
+      });
+      const edit = document.createElement('button');
+      edit.className = 'fav-edit-btn';
+      edit.textContent = favs.length ? 'Edit' : '+ Favorites';
+      edit.onclick = openFavModal;
+      bar.appendChild(edit);
+    }
+    function callFavorite(fav) {
+      // Start a dedicated room for this contact and show invite
+      const room = fav.room || Math.random().toString(36).slice(2, 8).toUpperCase();
+      fav.room = room;
+      const favs = loadFavorites();
+      const idx = favs.findIndex(x => x.name === fav.name);
+      if (idx >= 0) favs[idx] = fav;
+      saveFavorites(favs);
+      // If already in a call, end it first
+      if (peer) endCall();
+      setTimeout(() => {
+        roomInput.value = room;
+        nameInput.value = nameInput.value.trim() || 'Caller';
+        startCall(true, room);
+        statusEl.textContent = 'Calling ' + fav.name + '…';
+      }, 300);
+    }
+    function openFavModal() {
+      const modal = document.getElementById('favModal');
+      const list = document.getElementById('favList');
+      modal.classList.remove('hidden');
+      function redraw() {
+        const favs = loadFavorites();
+        list.innerHTML = '';
+        favs.forEach((f, i) => {
+          const row = document.createElement('div');
+          row.className = 'fav-row';
+          row.innerHTML = '<input value="' + (f.name || '') + '" data-i="' + i + '" /><button data-i="' + i + '">✕</button>';
+          list.appendChild(row);
+        });
+        list.querySelectorAll('input').forEach(inp => {
+          inp.onchange = () => {
+            const favs = loadFavorites();
+            favs[inp.dataset.i].name = inp.value.trim();
+            saveFavorites(favs);
+          };
+        });
+        list.querySelectorAll('button').forEach(btn => {
+          btn.onclick = () => {
+            const favs = loadFavorites();
+            favs.splice(btn.dataset.i, 1);
+            saveFavorites(favs);
+            redraw();
+            renderFavorites();
+          };
+        });
+      }
+      redraw();
+    }
+    document.getElementById('favAddBtn').onclick = () => {
+      const favs = loadFavorites();
+      if (favs.length >= 5) return;
+      const name = prompt('Contact name') || '';
+      if (!name.trim()) return;
+      favs.push({ name: name.trim(), room: null });
+      saveFavorites(favs);
+      openFavModal();
+      renderFavorites();
+    };
+    document.getElementById('favCloseBtn').onclick = () => {
+      document.getElementById('favModal').classList.add('hidden');
+      renderFavorites();
+    };
+    // Render favorites when call screen is shown
+    const origStartCall = startCall;
+    startCall = function(asHost, room) {
+      origStartCall(asHost, room);
+      setTimeout(renderFavorites, 100);
+    };
+
     // Auto-start room for app users (caller) when no room param is present
     (function autoStartForCaller() {
       const params = new URLSearchParams(window.location.search);
@@ -560,5 +673,13 @@
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
   </script>
+
+  <div id="favModal" class="fav-modal hidden">
+    <h3>Favorite Contacts (max 5)</h3>
+    <div class="fav-list" id="favList"></div>
+    <button id="favAddBtn" class="fav-add">+ Add Favorite</button>
+    <button id="favCloseBtn" class="fav-close">Done</button>
+  </div>
+
 </body>
 </html>
