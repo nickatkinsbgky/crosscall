@@ -1,4 +1,4 @@
-name: Build CrossCall APK
+name: Build HelloDarlin APK
 
 on:
   push:
@@ -20,16 +20,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate Gradle Wrapper
+        working-directory: android
+        run: |
+          gradle wrapper --gradle-version 8.5
+          chmod +x gradlew
 
       - name: Build Debug APK
         working-directory: android
-        run: gradle assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CrossCall-APK
+          name: HelloDarlin-APK
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 90
