@@ -70,6 +70,14 @@
     .invite-bar { margin-top: 10px; padding: 10px 12px; background: rgba(15,23,40,.9); border: 1px solid var(--line); border-radius: 12px; font-size: 13px; display: flex; align-items: center; gap: 8px; position: absolute; top: 60px; left: 12px; right: 12px; z-index: 20; }
     .invite-bar code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
     .copy-link-btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+
+    .waiting-fun { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; pointer-events: none; }
+    .waiting-fun .hearts { font-size: 48px; animation: float 3s ease-in-out infinite; }
+    .waiting-fun .msg { margin-top: 12px; font-size: 18px; font-weight: 600; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+    .waiting-fun .submsg { font-size: 14px; color: #ccc; margin-top: 4px; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+    .video-stage.solo:has(.local-tile):not(:has(.remote-tile)) .waiting-fun { display: flex; }
+
   </style>
 </head>
 <body>
@@ -106,7 +114,13 @@
   </div>
 
   <div id="callScreen" class="call hidden">
-    <div class="video-stage solo" id="videoStage"></div>
+    <div class="video-stage solo" id="videoStage">
+      <div class="waiting-fun" id="waitingFun" style="display:none;">
+        <div class="hearts">💖🎥</div>
+        <div class="msg">Waiting for your darlin'…</div>
+        <div class="submsg">Share the link above</div>
+      </div>
+    </div>
     <div class="top">
       <div class="pill" id="roomPill">Room: —</div>
       <div class="status" id="status">Connecting…</div>
@@ -225,6 +239,10 @@
       v.play().catch(() => {});
     }
 
+    function updateWaitingFun() {
+      const fun = document.getElementById('waitingFun');
+      if (fun) fun.style.display = (isHost && peers.size === 0) ? 'flex' : 'none';
+    }
     function updateLayout() {
       const count = peers.size;
       videoStage.classList.remove('solo', 'group', 'three');
@@ -265,7 +283,7 @@
       if (stream.getVideoTracks().length) tryPlay();
       else stream.onaddtrack = tryPlay;
 
-      updateLayout();
+      updateLayout(); updateWaitingFun();
     }
 
     function removePeer(peerId) {
@@ -276,7 +294,7 @@
         peers.delete(peerId);
       }
       dataConns.delete(peerId);
-      updateLayout();
+      updateLayout(); updateWaitingFun();
       if (peers.size === 0 && !isHost) statusEl.textContent = 'Waiting…';
     }
 
