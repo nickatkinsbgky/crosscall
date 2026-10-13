@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#0c1220" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="CrossCall" />
-  <title>CrossCall</title>
+  <meta name="apple-mobile-web-app-title" content="HelloDarlin'" />
+  <title>HelloDarlin'</title>
   <link rel="manifest" href="manifest.json" />
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <style>
@@ -75,9 +75,9 @@
 <body>
   <div id="lobby" class="screen lobby">
     <div class="brand">
-      <div class="logo">CC</div>
+      <div class="logo">HD</div>
       <div>
-        <h1>CrossCall</h1>
+        <h1>HelloDarlin'</h1>
         <p class="sub" id="lobbySub">Video calls that work on iPhone, Android, and desktop.</p>
       </div>
     </div>
@@ -96,7 +96,7 @@
   </div>
 
   <div id="incoming" class="incoming hidden">
-    <div class="logo pulse" style="width:64px;height:64px;font-size:28px;margin-bottom:16px;">CC</div>
+    <div class="logo pulse" style="width:64px;height:64px;font-size:28px;margin-bottom:16px;">HD</div>
     <h2 id="incomingTitle">Incoming call</h2>
     <p class="caller" id="callerName">Someone is calling…</p>
     <div class="actions">
@@ -196,7 +196,7 @@
 
     function showBrowserNotification(title, body) {
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      try { new Notification(title, { body, tag: 'crosscall-incoming', renotify: true }); } catch (e) {}
+      try { new Notification(title, { body, tag: 'hellodarlin-incoming', renotify: true }); } catch (e) {}
     }
     async function requestNotifPermission() {
       if (!('Notification' in window) || Notification.permission !== 'default') return;
@@ -501,8 +501,8 @@
       }
     });
 
-    try { const saved = localStorage.getItem('crosscall-name'); if (saved) nameInput.value = saved; } catch (e) {}
-    nameInput.addEventListener('change', () => { try { localStorage.setItem('crosscall-name', nameInput.value.trim()); } catch (e) {} });
+    try { const saved = localStorage.getItem('hellodarlin-name'); if (saved) nameInput.value = saved; } catch (e) {}
+    nameInput.addEventListener('change', () => { try { localStorage.setItem('hellodarlin-name', nameInput.value.trim()); } catch (e) {} });
 
     (function handleInviteLink() {
       const params = new URLSearchParams(window.location.search);
