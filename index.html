@@ -2,55 +2,389 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#0c1220" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CrossCall" />
   <title>CrossCall</title>
   <link rel="manifest" href="manifest.json" />
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <style>
-    :root { --bg:#0c1220; --card:#161e2e; --line:#2a3650; --text:#f4f7fb; --muted:#9aa8be; --blue:#3d7eff; --danger:#ff5d6c; --ok:#3dd68c; }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    :root {
+      --bg: #0c1220;
+      --card: #161e2e;
+      --line: #2a3650;
+      --text: #f4f7fb;
+      --muted: #9aa8be;
+      --blue: #3d7eff;
+      --danger: #ff5d6c;
+      --ok: #3dd68c;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overscroll-behavior: none;
+      touch-action: manipulation;
+    }
     button, input { font: inherit; color: inherit; }
-    .screen { min-height: 100dvh; }
-    .lobby { max-width: 460px; margin: 0 auto; padding: 28px 18px 40px; }
+    .screen { min-height: 100dvh; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+    .lobby {
+      max-width: 460px;
+      margin: 0 auto;
+      padding: calc(28px + var(--safe-top)) 18px calc(40px + var(--safe-bottom));
+    }
     .brand { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; }
-    .logo { width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(160deg, #6aa2ff, #1d4ed8); display: grid; place-items: center; font-weight: 800; }
+    .logo {
+      width: 46px; height: 46px; border-radius: 14px;
+      background: linear-gradient(160deg, #6aa2ff, #1d4ed8);
+      display: grid; place-items: center; font-weight: 800; font-size: 20px;
+    }
     h1 { margin: 0; font-size: 28px; letter-spacing: -.04em; }
     .sub { color: var(--muted); margin: 4px 0 0; font-size: 14px; line-height: 1.4; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-top: 14px; }
     label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 6px; }
-    input { width: 100%; background: #0f1728; border: 1px solid var(--line); border-radius: 12px; padding: 13px; outline: none; }
+    input {
+      width: 100%; background: #0f1728; border: 1px solid var(--line);
+      border-radius: 12px; padding: 14px; outline: none; font-size: 16px;
+    }
     input:focus { border-color: var(--blue); }
     .row { display: flex; gap: 8px; margin-top: 12px; }
-    .btn { border: 0; border-radius: 12px; padding: 13px 14px; background: var(--blue); font-weight: 700; cursor: pointer; }
+    .btn {
+      border: 0; border-radius: 12px; padding: 14px 16px; background: var(--blue);
+      font-weight: 700; cursor: pointer; min-height: 48px; font-size: 16px;
+    }
     .btn.secondary { background: #0f1728; border: 1px solid var(--line); font-weight: 600; }
     .btn.full { width: 100%; }
     .btn:disabled { opacity: .55; }
-    .fine { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
-    .call { display: flex; flex-direction: column; min-height: 100dvh; }
-    .top { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px 8px; }
-    .pill { background: #122033; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font-size: 12px; color: var(--muted); }
-    .grid { flex: 1; display: grid; gap: 8px; padding: 8px 12px 12px; grid-template-columns: 1fr; }
+    .btn:active { transform: scale(0.98); }
+    .fine { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 8px; }
+    .call {
+      display: flex; flex-direction: column;
+      min-height: 100dvh;
+      padding-bottom: var(--safe-bottom);
+    }
+    .top {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: calc(14px + var(--safe-top)) 14px 8px;
+      gap: 8px;
+    }
+    .pill {
+      background: #122033; border: 1px solid var(--line); border-radius: 999px;
+      padding: 6px 12px; font-size: 13px; color: var(--muted); max-width: 55%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .grid {
+      flex: 1; display: grid; gap: 8px;
+      padding: 8px 12px 12px;
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
     .grid.multi { grid-template-columns: 1fr 1fr; }
-    .tile { position: relative; background: #10192b; border-radius: 16px; overflow: hidden; min-height: 180px; }
-    video { width: 100%; height: 100%; object-fit: cover; background: #0b1220; display: block; min-height: 180px; }
-    .tag { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.55); border-radius: 999px; padding: 4px 8px; font-size: 12px; }
-    .controls { display: flex; justify-content: center; gap: 10px; padding: 8px 12px 22px; }
-    .round { width: 54px; height: 54px; border-radius: 50%; border: 0; background: #1b2740; color: white; font-size: 13px; font-weight: 700; }
+    @media (max-width: 480px) {
+      .grid.multi { grid-template-columns: 1fr; }
+    }
+    @media (orientation: landscape) and (max-height: 500px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+      .tile { min-height: 120px; }
+    }
+    .tile {
+      position: relative; background: #10192b; border-radius: 16px;
+      overflow: hidden; min-height: 200px;
+    }
+    video {
+      width: 100%; height: 100%; object-fit: cover; background: #0b1220;
+      display: block; min-height: 200px;
+    }
+    .tag {
+      position: absolute; left: 8px; bottom: 8px;
+      background: rgba(0,0,0,.6); border-radius: 999px;
+      padding: 5px 10px; font-size: 13px; font-weight: 600;
+    }
+    .local-tile { position: absolute; right: 12px; bottom: calc(90px + var(--safe-bottom)); width: 110px; height: 150px; z-index: 10; border-radius: 14px; border: 2px solid var(--line); }
+    @media (min-width: 600px) {
+      .local-tile { width: 140px; height: 190px; }
+    }
+    .controls {
+      display: flex; justify-content: center; gap: 12px;
+      padding: 8px 12px calc(16px + var(--safe-bottom));
+      background: linear-gradient(to top, rgba(12,18,32,.95), transparent);
+    }
+    .round {
+      width: 56px; height: 56px; border-radius: 50%; border: 0;
+      background: #1b2740; color: white; font-size: 14px; font-weight: 700;
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .round:active { transform: scale(0.94); }
     .round.off { background: #3a2a2e; color: #ffb4bc; }
-    .round.end { background: var(--danger); color: #2a0b10; }
+    .round.end { background: var(--danger); color: #2a0b10; width: 64px; height: 64px; }
     .status { color: var(--ok); font-size: 13px; }
     .err { color: #ffb4bc; font-size: 13px; margin-top: 8px; }
-    .hidden { display: none; }
-    /* Uniform professional buttons */
-    .btn, button { min-height: 40px; padding: 10px 16px; font-weight: 600; border-radius: 10px; transition: all .15s ease; }
-    .btn:hover, button:hover { filter: brightness(1.08); transform: translateY(-1px); }
-    .round { min-width: 52px; min-height: 52px; }
+    .hidden { display: none !important; }
+    .share-row { display: flex; gap: 8px; margin-top: 8px; }
+    .share-row input { flex: 1; }
   </style>
 </head>
 <body>
-  <!-- original body content unchanged -->
+  <!-- Lobby -->
+  <div id="lobby" class="screen lobby">
+    <div class="brand">
+      <div class="logo">CC</div>
+      <div>
+        <h1>CrossCall</h1>
+        <p class="sub">Video calls that work on iPhone, Android, and desktop.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="name">Your name</label>
+      <input id="name" type="text" placeholder="Your name" autocomplete="name" />
+
+      <label for="room">Room code</label>
+      <input id="room" type="text" placeholder="Leave blank to create a new room" autocomplete="off" />
+
+      <div class="row">
+        <button id="createBtn" class="btn full">Create Room</button>
+        <button id="joinBtn" class="btn secondary full">Join Room</button>
+      </div>
+      <p class="fine">Share the room code with the other person. Works best on Wi-Fi or good cellular.</p>
+      <div id="lobbyErr" class="err hidden"></div>
+    </div>
+  </div>
+
+  <!-- Call -->
+  <div id="callScreen" class="call hidden">
+    <div class="top">
+      <div class="pill" id="roomPill">Room: —</div>
+      <div class="status" id="status">Connecting…</div>
+    </div>
+    <div class="grid" id="videoGrid">
+      <!-- remote videos go here -->
+    </div>
+    <div class="controls">
+      <button id="micBtn" class="round" title="Mute">Mic</button>
+      <button id="camBtn" class="round" title="Camera">Cam</button>
+      <button id="endBtn" class="round end" title="End">End</button>
+    </div>
+  </div>
+
+  <script>
+    const lobby = document.getElementById('lobby');
+    const callScreen = document.getElementById('callScreen');
+    const nameInput = document.getElementById('name');
+    const roomInput = document.getElementById('room');
+    const createBtn = document.getElementById('createBtn');
+    const joinBtn = document.getElementById('joinBtn');
+    const lobbyErr = document.getElementById('lobbyErr');
+    const roomPill = document.getElementById('roomPill');
+    const statusEl = document.getElementById('status');
+    const videoGrid = document.getElementById('videoGrid');
+    const micBtn = document.getElementById('micBtn');
+    const camBtn = document.getElementById('camBtn');
+    const endBtn = document.getElementById('endBtn');
+
+    let peer, localStream, currentCall, roomCode, myName;
+    let micOn = true, camOn = true;
+    let wakeLock = null;
+
+    function showErr(msg) {
+      lobbyErr.textContent = msg;
+      lobbyErr.classList.remove('hidden');
+    }
+    function hideErr() {
+      lobbyErr.classList.add('hidden');
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) { /* ignore */ }
+    }
+    function releaseWakeLock() {
+      if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    }
+
+    async function getMedia() {
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: true
+        });
+      } catch (e) {
+        throw new Error('Camera/microphone access denied or unavailable. Check permissions.');
+      }
+    }
+
+    function createLocalVideo(stream) {
+      const existing = document.querySelector('.local-tile');
+      if (existing) existing.remove();
+      const tile = document.createElement('div');
+      tile.className = 'tile local-tile';
+      const v = document.createElement('video');
+      v.srcObject = stream;
+      v.muted = true;
+      v.autoplay = true;
+      v.playsInline = true;
+      v.setAttribute('playsinline', '');
+      tile.appendChild(v);
+      const tag = document.createElement('div');
+      tag.className = 'tag';
+      tag.textContent = myName || 'You';
+      tile.appendChild(tag);
+      document.body.appendChild(tile);
+      v.play().catch(() => {});
+    }
+
+    function addRemoteVideo(stream, label) {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.dataset.peer = label;
+      const v = document.createElement('video');
+      v.srcObject = stream;
+      v.autoplay = true;
+      v.playsInline = true;
+      v.setAttribute('playsinline', '');
+      tile.appendChild(v);
+      const tag = document.createElement('div');
+      tag.className = 'tag';
+      tag.textContent = label || 'Remote';
+      tile.appendChild(tag);
+      videoGrid.appendChild(tile);
+      if (videoGrid.children.length > 1) videoGrid.classList.add('multi');
+      v.play().catch(() => {});
+    }
+
+    function startCall(asHost, room) {
+      hideErr();
+      myName = nameInput.value.trim() || 'User';
+      roomCode = room || Math.random().toString(36).slice(2, 8).toUpperCase();
+
+      lobby.classList.add('hidden');
+      callScreen.classList.remove('hidden');
+      roomPill.textContent = 'Room: ' + roomCode;
+      statusEl.textContent = asHost ? 'Waiting for someone to join…' : 'Connecting…';
+
+      requestWakeLock();
+
+      getMedia().then(stream => {
+        localStream = stream;
+        createLocalVideo(stream);
+
+        peer = new Peer(asHost ? roomCode : undefined, {
+          debug: 1,
+          config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+        });
+
+        peer.on('open', id => {
+          if (!asHost) {
+            // Join by calling the host (room code is host's peer id)
+            const call = peer.call(roomCode, localStream, { metadata: { name: myName } });
+            setupCall(call);
+          }
+        });
+
+        peer.on('call', call => {
+          call.answer(localStream);
+          setupCall(call);
+          statusEl.textContent = 'Connected';
+        });
+
+        peer.on('error', err => {
+          statusEl.textContent = 'Error';
+          showErr(err.message || 'Connection failed');
+          endCall();
+        });
+
+      }).catch(err => {
+        showErr(err.message);
+        endCall();
+      });
+    }
+
+    function setupCall(call) {
+      currentCall = call;
+      call.on('stream', remoteStream => {
+        const name = call.metadata?.name || 'Remote';
+        addRemoteVideo(remoteStream, name);
+        statusEl.textContent = 'In call';
+      });
+      call.on('close', () => {
+        statusEl.textContent = 'Call ended';
+        setTimeout(endCall, 800);
+      });
+      call.on('error', () => statusEl.textContent = 'Connection lost');
+    }
+
+    function endCall() {
+      if (currentCall) { currentCall.close(); currentCall = null; }
+      if (peer) { peer.destroy(); peer = null; }
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      releaseWakeLock();
+      document.querySelectorAll('.local-tile').forEach(el => el.remove());
+      videoGrid.innerHTML = '';
+      videoGrid.classList.remove('multi');
+      callScreen.classList.add('hidden');
+      lobby.classList.remove('hidden');
+      statusEl.textContent = 'Connecting…';
+    }
+
+    createBtn.addEventListener('click', () => startCall(true, roomInput.value.trim() || undefined));
+    joinBtn.addEventListener('click', () => {
+      const room = roomInput.value.trim();
+      if (!room) { showErr('Enter a room code to join'); return; }
+      startCall(false, room);
+    });
+
+    micBtn.addEventListener('click', () => {
+      if (!localStream) return;
+      micOn = !micOn;
+      localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+      micBtn.classList.toggle('off', !micOn);
+      micBtn.textContent = micOn ? 'Mic' : 'Muted';
+    });
+
+    camBtn.addEventListener('click', () => {
+      if (!localStream) return;
+      camOn = !camOn;
+      localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+      camBtn.classList.toggle('off', !camOn);
+      camBtn.textContent = camOn ? 'Cam' : 'Off';
+    });
+
+    endBtn.addEventListener('click', endCall);
+
+    // Copy room code on pill click
+    roomPill.addEventListener('click', () => {
+      if (navigator.clipboard && roomCode) {
+        navigator.clipboard.writeText(roomCode).then(() => {
+          const orig = roomPill.textContent;
+          roomPill.textContent = 'Copied!';
+          setTimeout(() => roomPill.textContent = orig, 1500);
+        });
+      }
+    });
+
+    // Restore name if previously used
+    try {
+      const saved = localStorage.getItem('crosscall-name');
+      if (saved) nameInput.value = saved;
+    } catch (e) {}
+    nameInput.addEventListener('change', () => {
+      try { localStorage.setItem('crosscall-name', nameInput.value.trim()); } catch (e) {}
+    });
+  </script>
 </body>
 </html>
