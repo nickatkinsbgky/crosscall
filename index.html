@@ -539,14 +539,21 @@
     (function autoStartForCaller() {
       const params = new URLSearchParams(window.location.search);
       if (params.has('room')) return; // receiver or explicit join
-      // Small delay so name can load from localStorage
+      // Force start even if lobby is visible
       setTimeout(() => {
-        if (document.getElementById('callScreen').classList.contains('hidden')) {
-          const name = nameInput.value.trim() || 'Caller';
+        try {
+          const name = (nameInput.value || '').trim() || 'Caller';
           nameInput.value = name;
-          startCall(true); // auto-create room as host
+          if (lobby && !lobby.classList.contains('hidden')) {
+            startCall(true);
+          } else if (document.getElementById('callScreen').classList.contains('hidden')) {
+            startCall(true);
+          }
+        } catch (e) {
+          console.error('Auto-start failed', e);
+          setTimeout(() => { try { startCall(true); } catch (e2) {} }, 500);
         }
-      }, 800);
+      }, 600);
     })();
 
     if ('serviceWorker' in navigator) {
