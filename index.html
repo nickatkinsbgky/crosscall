@@ -144,6 +144,13 @@
     </div>
   </div>
 
+  <div id="favModal" class="fav-modal hidden">
+    <h3>Favorite Contacts (max 5)</h3>
+    <div class="fav-list" id="favList"></div>
+    <button id="favAddBtn" class="fav-add">+ Add Favorite</button>
+    <button id="favCloseBtn" class="fav-close">Done</button>
+  </div>
+
   <script>
     const lobby = document.getElementById('lobby');
     const callScreen = document.getElementById('callScreen');
@@ -636,7 +643,7 @@
       openFavModal();
       renderFavorites();
     };
-    document.getElementById('favAddBtn').onclick = async () => {
+    const favAddBtn = document.getElementById('favAddBtn'); if (favAddBtn) favAddBtn.onclick = async () => {
       const favs = loadFavorites();
       if (favs.length >= 5) { alert('Maximum 5 favorites'); return; }
       // Native Android contact picker
@@ -658,7 +665,7 @@
       const name = prompt('Contact name') || '';
       if (name.trim()) window.onContactSelected(name);
     };
-    document.getElementById('favCloseBtn').onclick = () => {
+    const favCloseBtn = document.getElementById('favCloseBtn'); if (favCloseBtn) favCloseBtn.onclick = () => {
       document.getElementById('favModal').classList.add('hidden');
       renderFavorites();
     };
@@ -694,13 +701,6 @@
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
   </script>
-
-  <div id="favModal" class="fav-modal hidden">
-    <h3>Favorite Contacts (max 5)</h3>
-    <div class="fav-list" id="favList"></div>
-    <button id="favAddBtn" class="fav-add">+ Add Favorite</button>
-    <button id="favCloseBtn" class="fav-close">Done</button>
-  </div>
 
 </body>
 </html>
