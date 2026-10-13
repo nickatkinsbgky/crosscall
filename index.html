@@ -627,10 +627,27 @@
       }
       redraw();
     }
-    document.getElementById('favAddBtn').onclick = () => {
+    document.getElementById('favAddBtn').onclick = async () => {
       const favs = loadFavorites();
-      if (favs.length >= 5) return;
-      const name = prompt('Contact name') || '';
+      if (favs.length >= 5) { alert('Maximum 5 favorites'); return; }
+      // Prefer device contacts picker
+      if (navigator.contacts && navigator.contacts.select) {
+        try {
+          const contacts = await navigator.contacts.select(['name'], { multiple: false });
+          if (contacts && contacts.length) {
+            const name = (contacts[0].name && contacts[0].name[0]) || 'Contact';
+            favs.push({ name: name.trim(), room: null });
+            saveFavorites(favs);
+            openFavModal();
+            renderFavorites();
+            return;
+          }
+        } catch (e) {
+          console.warn('Contacts picker failed', e);
+        }
+      }
+      // Fallback to manual entry
+      const name = prompt('Contact name (or grant contacts permission)') || '';
       if (!name.trim()) return;
       favs.push({ name: name.trim(), room: null });
       saveFavorites(favs);
