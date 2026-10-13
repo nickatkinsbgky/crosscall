@@ -156,6 +156,13 @@
     window.closeFavModal = function() {
       const m = document.getElementById('favModal');
       if (m) m.classList.add('hidden');
+      // Make sure call screen is visible
+      const call = document.getElementById('callScreen');
+      const lobby = document.getElementById('lobby');
+      if (call) call.classList.remove('hidden');
+      if (lobby) lobby.classList.add('hidden');
+      // Refresh favorites bar
+      if (typeof renderFavorites === 'function') renderFavorites();
     };
     window.addFavorite = async function() {
       const favs = JSON.parse(localStorage.getItem('hellodarlin-favorites') || '[]');
