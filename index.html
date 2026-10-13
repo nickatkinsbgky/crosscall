@@ -147,11 +147,31 @@
   <div id="favModal" class="fav-modal hidden">
     <h3>Favorite Contacts (max 5)</h3>
     <div class="fav-list" id="favList"></div>
-    <button id="favAddBtn" class="fav-add">+ Add Favorite</button>
-    <button id="favCloseBtn" class="fav-close">Done</button>
+    <button id="favAddBtn" class="fav-add" onclick="window.addFavorite()">+ Add Favorite</button>
+    <button id="favCloseBtn" class="fav-close" onclick="window.closeFavModal()">Done</button>
   </div>
 
   <script>
+    
+    window.closeFavModal = function() {
+      const m = document.getElementById('favModal');
+      if (m) m.classList.add('hidden');
+    };
+    window.addFavorite = async function() {
+      const favs = JSON.parse(localStorage.getItem('hellodarlin-favorites') || '[]');
+      if (favs.length >= 5) { alert('Maximum 5 favorites'); return; }
+      if (typeof Android !== 'undefined' && Android.pickContact) {
+        try { Android.pickContact(); return; } catch (e) { console.error(e); }
+      }
+      const name = prompt('Contact name') || '';
+      if (name.trim()) {
+        favs.push({ name: name.trim(), room: null });
+        localStorage.setItem('hellodarlin-favorites', JSON.stringify(favs));
+        if (window.onContactSelected) window.onContactSelected(name);
+        else location.reload();
+      }
+    };
+
     const lobby = document.getElementById('lobby');
     const callScreen = document.getElementById('callScreen');
     const incoming = document.getElementById('incoming');
