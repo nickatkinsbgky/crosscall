@@ -23,7 +23,8 @@ class MainActivity : AppCompatActivity() {
   private val PERMISSIONS = arrayOf(
     Manifest.permission.CAMERA,
     Manifest.permission.RECORD_AUDIO,
-    Manifest.permission.READ_CONTACTS
+    Manifest.permission.READ_CONTACTS,
+    Manifest.permission.SEND_SMS
   )
   private val REQ = 100
 
@@ -31,15 +32,34 @@ class MainActivity : AppCompatActivity() {
     if (result.resultCode == RESULT_OK && result.data != null) {
       val uri: Uri? = result.data?.data
       if (uri != null) {
-        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY), null, null, null)
+        var name = "Contact"
+        var phone = ""
+        val cursor = contentResolver.query(uri, null, null, null, null)
         cursor?.use {
           if (it.moveToFirst()) {
-            val name = it.getString(0) ?: "Contact"
-            val quoted = org.json.JSONObject.quote(name)
-            webView.post {
-              webView.evaluateJavascript("window.onContactSelected && window.onContactSelected($quoted)", null)
+            name = it.getString(it.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)) ?: "Contact"
+            val id = it.getString(it.getColumnIndexOrThrow(ContactsContract.Contacts._ID))
+            val hasPhone = it.getInt(it.getColumnIndexOrThrow(ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0
+            if (hasPhone) {
+              val phones = contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                null,
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                arrayOf(id),
+                null
+              )
+              phones?.use { p ->
+                if (p.moveToFirst()) {
+                  phone = p.getString(p.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)) ?: ""
+                }
+              }
             }
           }
+        }
+        val nameQ = org.json.JSONObject.quote(name)
+        val phoneQ = org.json.JSONObject.quote(phone)
+        webView.post {
+          webView.evaluateJavascript("window.onContactSelected && window.onContactSelected($nameQ, $phoneQ)", null)
         }
       }
     }
@@ -97,6 +117,21 @@ class MainActivity : AppCompatActivity() {
         try {
           val intent = Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI)
           activity.contactPicker.launch(intent)
+        } catch (e: Exception) {
+          e.printStackTrace()
+        }
+      }
+    }
+
+    @JavascriptInterface
+    fun sendSms(phone: String, message: String) {
+      activity.runOnUiThread {
+        try {
+          val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("smsto:$phone")
+            putExtra("sms_body", message)
+          }
+          activity.startActivity(intent)
         } catch (e: Exception) {
           e.printStackTrace()
         }
