@@ -627,32 +627,37 @@
       }
       redraw();
     }
+    window.onContactSelected = function(name) {
+      if (!name || !name.trim()) return;
+      const favs = loadFavorites();
+      if (favs.length >= 5) return;
+      favs.push({ name: name.trim(), room: null });
+      saveFavorites(favs);
+      openFavModal();
+      renderFavorites();
+    };
     document.getElementById('favAddBtn').onclick = async () => {
       const favs = loadFavorites();
       if (favs.length >= 5) { alert('Maximum 5 favorites'); return; }
-      // Prefer device contacts picker
+      // Native Android contact picker
+      if (window.Android && window.Android.pickContact) {
+        window.Android.pickContact();
+        return;
+      }
+      // Web Contacts API fallback
       if (navigator.contacts && navigator.contacts.select) {
         try {
           const contacts = await navigator.contacts.select(['name'], { multiple: false });
           if (contacts && contacts.length) {
             const name = (contacts[0].name && contacts[0].name[0]) || 'Contact';
-            favs.push({ name: name.trim(), room: null });
-            saveFavorites(favs);
-            openFavModal();
-            renderFavorites();
+            window.onContactSelected(name);
             return;
           }
-        } catch (e) {
-          console.warn('Contacts picker failed', e);
-        }
+        } catch (e) { console.warn('Web contacts failed', e); }
       }
-      // Fallback to manual entry
-      const name = prompt('Contact name (or grant contacts permission)') || '';
-      if (!name.trim()) return;
-      favs.push({ name: name.trim(), room: null });
-      saveFavorites(favs);
-      openFavModal();
-      renderFavorites();
+      // Manual fallback
+      const name = prompt('Contact name') || '';
+      if (name.trim()) window.onContactSelected(name);
     };
     document.getElementById('favCloseBtn').onclick = () => {
       document.getElementById('favModal').classList.add('hidden');
