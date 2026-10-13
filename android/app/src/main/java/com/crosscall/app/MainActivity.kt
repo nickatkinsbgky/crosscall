@@ -24,7 +24,6 @@ class MainActivity : AppCompatActivity() {
     Manifest.permission.CAMERA,
     Manifest.permission.RECORD_AUDIO,
     Manifest.permission.READ_CONTACTS,
-    Manifest.permission.SEND_SMS
   )
   private val REQ = 100
 
@@ -127,13 +126,22 @@ class MainActivity : AppCompatActivity() {
     fun sendSms(phone: String, message: String) {
       activity.runOnUiThread {
         try {
-          val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("smsto:$phone")
+          val intent = Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse("sms:$phone")
             putExtra("sms_body", message)
           }
           activity.startActivity(intent)
         } catch (e: Exception) {
-          e.printStackTrace()
+          // Fallback
+          try {
+            val intent2 = Intent(Intent.ACTION_SENDTO).apply {
+              data = Uri.parse("smsto:$phone")
+              putExtra("sms_body", message)
+            }
+            activity.startActivity(intent2)
+          } catch (e2: Exception) {
+            e2.printStackTrace()
+          }
         }
       }
     }
