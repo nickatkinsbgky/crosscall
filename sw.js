@@ -1,4 +1,4 @@
-const CACHE = "crosscall-v13";
+const CACHE = "crosscall-v14";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
