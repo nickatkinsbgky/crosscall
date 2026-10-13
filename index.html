@@ -131,6 +131,26 @@
     .hidden { display: none !important; }
     .share-row { display: flex; gap: 8px; margin-top: 8px; }
     .share-row input { flex: 1; }
+
+    /* Incoming call overlay */
+    .incoming {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(8, 12, 22, 0.92);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: calc(24px + var(--safe-top)) 20px calc(24px + var(--safe-bottom));
+      text-align: center;
+    }
+    .incoming h2 { margin: 0 0 6px; font-size: 26px; }
+    .incoming .caller { font-size: 18px; color: var(--muted); margin-bottom: 28px; }
+    .incoming .actions { display: flex; gap: 24px; }
+    .incoming .round { width: 72px; height: 72px; font-size: 15px; }
+    .incoming .accept { background: var(--ok); color: #0a1f14; }
+    .incoming .decline { background: var(--danger); color: #2a0b10; }
+    .pulse { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.85; }
+    }
   </style>
 </head>
 <body>
@@ -155,8 +175,19 @@
         <button id="createBtn" class="btn full">Create Room</button>
         <button id="joinBtn" class="btn secondary full">Join Room</button>
       </div>
-      <p class="fine">Share the room code with the other person. Works best on Wi-Fi or good cellular.</p>
+      <p class="fine">Share the room code. The host will get a ringtone and notification when someone joins.</p>
       <div id="lobbyErr" class="err hidden"></div>
+    </div>
+  </div>
+
+  <!-- Incoming call overlay -->
+  <div id="incoming" class="incoming hidden">
+    <div class="logo pulse" style="width:64px;height:64px;font-size:28px;margin-bottom:16px;">CC</div>
+    <h2>Incoming call</h2>
+    <p class="caller" id="callerName">Someone is calling…</p>
+    <div class="actions">
+      <button id="declineBtn" class="round decline">Decline</button>
+      <button id="acceptBtn" class="round accept">Accept</button>
     </div>
   </div>
 
@@ -179,6 +210,8 @@
   <script>
     const lobby = document.getElementById('lobby');
     const callScreen = document.getElementById('callScreen');
+    const incoming = document.getElementById('incoming');
+    const callerNameEl = document.getElementById('callerName');
     const nameInput = document.getElementById('name');
     const roomInput = document.getElementById('room');
     const createBtn = document.getElementById('createBtn');
@@ -190,10 +223,15 @@
     const micBtn = document.getElementById('micBtn');
     const camBtn = document.getElementById('camBtn');
     const endBtn = document.getElementById('endBtn');
+    const acceptBtn = document.getElementById('acceptBtn');
+    const declineBtn = document.getElementById('declineBtn');
 
-    let peer, localStream, currentCall, roomCode, myName;
+    let peer, localStream, currentCall, roomCode, myName, isHost = false;
     let micOn = true, camOn = true;
     let wakeLock = null;
+    let pendingCall = null;
+    let ringtoneInterval = null;
+    let audioCtx = null;
 
     function showErr(msg) {
       lobbyErr.textContent = msg;
@@ -212,6 +250,51 @@
     }
     function releaseWakeLock() {
       if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    }
+
+    // Simple ringtone using Web Audio API (no external files)
+    function startRingtone() {
+      stopRingtone();
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const playTone = () => {
+          if (!audioCtx) return;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(480, audioCtx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+          osc.connect(gain).connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.4);
+        };
+        playTone();
+        ringtoneInterval = setInterval(playTone, 1400);
+      } catch (e) { /* ignore audio errors */ }
+      // Vibrate on mobile
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+    }
+    function stopRingtone() {
+      if (ringtoneInterval) { clearInterval(ringtoneInterval); ringtoneInterval = null; }
+      if (navigator.vibrate) navigator.vibrate(0);
+    }
+
+    function showBrowserNotification(title, body) {
+      if (!('Notification' in window)) return;
+      if (Notification.permission === 'granted') {
+        try {
+          new Notification(title, { body, tag: 'crosscall-incoming', renotify: true });
+        } catch (e) {}
+      }
+    }
+
+    async function requestNotifPermission() {
+      if (!('Notification' in window)) return;
+      if (Notification.permission === 'default') {
+        try { await Notification.requestPermission(); } catch (e) {}
+      }
     }
 
     async function getMedia() {
@@ -267,6 +350,7 @@
     function startCall(asHost, room) {
       hideErr();
       myName = nameInput.value.trim() || 'User';
+      isHost = asHost;
       roomCode = room || Math.random().toString(36).slice(2, 8).toUpperCase();
 
       lobby.classList.add('hidden');
@@ -275,6 +359,7 @@
       statusEl.textContent = asHost ? 'Waiting for someone to join…' : 'Connecting…';
 
       requestWakeLock();
+      if (asHost) requestNotifPermission();
 
       getMedia().then(stream => {
         localStream = stream;
@@ -287,16 +372,20 @@
 
         peer.on('open', id => {
           if (!asHost) {
-            // Join by calling the host (room code is host's peer id)
             const call = peer.call(roomCode, localStream, { metadata: { name: myName } });
             setupCall(call);
           }
         });
 
         peer.on('call', call => {
-          call.answer(localStream);
-          setupCall(call);
-          statusEl.textContent = 'Connected';
+          // Host receives incoming call — show notification UI instead of auto-answering
+          pendingCall = call;
+          const caller = call.metadata?.name || 'Someone';
+          callerNameEl.textContent = caller + ' is calling…';
+          incoming.classList.remove('hidden');
+          statusEl.textContent = 'Incoming call';
+          startRingtone();
+          showBrowserNotification('Incoming CrossCall', caller + ' is calling you');
         });
 
         peer.on('error', err => {
@@ -311,12 +400,34 @@
       });
     }
 
+    function acceptCall() {
+      if (!pendingCall || !localStream) return;
+      stopRingtone();
+      incoming.classList.add('hidden');
+      pendingCall.answer(localStream);
+      setupCall(pendingCall);
+      statusEl.textContent = 'Connected';
+      pendingCall = null;
+    }
+
+    function declineCall() {
+      stopRingtone();
+      incoming.classList.add('hidden');
+      if (pendingCall) {
+        pendingCall.close();
+        pendingCall = null;
+      }
+      statusEl.textContent = isHost ? 'Waiting for someone to join…' : 'Call declined';
+    }
+
     function setupCall(call) {
       currentCall = call;
       call.on('stream', remoteStream => {
         const name = call.metadata?.name || 'Remote';
         addRemoteVideo(remoteStream, name);
         statusEl.textContent = 'In call';
+        stopRingtone();
+        incoming.classList.add('hidden');
       });
       call.on('close', () => {
         statusEl.textContent = 'Call ended';
@@ -326,6 +437,8 @@
     }
 
     function endCall() {
+      stopRingtone();
+      if (pendingCall) { pendingCall.close(); pendingCall = null; }
       if (currentCall) { currentCall.close(); currentCall = null; }
       if (peer) { peer.destroy(); peer = null; }
       if (localStream) {
@@ -336,6 +449,7 @@
       document.querySelectorAll('.local-tile').forEach(el => el.remove());
       videoGrid.innerHTML = '';
       videoGrid.classList.remove('multi');
+      incoming.classList.add('hidden');
       callScreen.classList.add('hidden');
       lobby.classList.remove('hidden');
       statusEl.textContent = 'Connecting…';
@@ -347,6 +461,9 @@
       if (!room) { showErr('Enter a room code to join'); return; }
       startCall(false, room);
     });
+
+    acceptBtn.addEventListener('click', acceptCall);
+    declineBtn.addEventListener('click', declineCall);
 
     micBtn.addEventListener('click', () => {
       if (!localStream) return;
