@@ -217,8 +217,7 @@
       const v = document.createElement('video');
       v.srcObject = stream; v.autoplay = true; v.playsInline = true; v.setAttribute('playsinline', '');
       tile.appendChild(v);
-      const tag = document.createElement('div');
-      tag.className = 'tag'; tag.textContent = label || 'Remote';
+      const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = label || 'Remote';
       tile.appendChild(tag);
       videoGrid.appendChild(tile);
       if (videoGrid.children.length > 1) videoGrid.classList.add('multi');
@@ -411,6 +410,11 @@
         setTimeout(() => nameInput.focus(), 100);
       }
     })();
+
+    // Register service worker for PWA installability
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
   </script>
 </body>
 </html>
