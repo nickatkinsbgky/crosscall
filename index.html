@@ -36,19 +36,16 @@
     .btn:disabled { opacity: .55; }
     .btn:active { transform: scale(0.98); }
     .fine { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 8px; }
-    .call { display: flex; flex-direction: column; min-height: 100dvh; padding-bottom: var(--safe-bottom); }
-    .top { display: flex; justify-content: space-between; align-items: center; padding: calc(14px + var(--safe-top)) 14px 8px; gap: 8px; }
-    .pill { background: #122033; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-    .grid { flex: 1; display: grid; gap: 8px; padding: 8px 12px 12px; grid-template-columns: 1fr; min-height: 0; }
-    .grid.multi { grid-template-columns: 1fr 1fr; }
-    @media (max-width: 480px) { .grid.multi { grid-template-columns: 1fr; } }
-    @media (orientation: landscape) and (max-height: 500px) { .grid { grid-template-columns: 1fr 1fr; } .tile { min-height: 120px; } }
-    .tile { position: relative; background: #10192b; border-radius: 16px; overflow: hidden; min-height: 200px; }
-    video { width: 100%; height: 100%; object-fit: cover; background: #0b1220; display: block; min-height: 200px; }
-    .tag { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.6); border-radius: 999px; padding: 5px 10px; font-size: 13px; font-weight: 600; }
-    .local-tile { position: absolute; right: 12px; bottom: calc(90px + var(--safe-bottom)); width: 110px; height: 150px; z-index: 10; border-radius: 14px; border: 2px solid var(--line); }
+    .call { display: flex; flex-direction: column; min-height: 100dvh; padding-bottom: var(--safe-bottom); position: relative; }
+    .top { display: flex; justify-content: space-between; align-items: center; padding: calc(14px + var(--safe-top)) 14px 8px; gap: 8px; position: absolute; top: 0; left: 0; right: 0; z-index: 20; background: linear-gradient(to bottom, rgba(12,18,32,.7), transparent); }
+    .pill { background: rgba(18,32,51,.8); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    .video-stage { position: absolute; inset: 0; background: #000; }
+    .remote-full { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #0b1220; }
+    .local-tile { position: absolute; right: 12px; bottom: calc(90px + var(--safe-bottom)); width: 110px; height: 150px; z-index: 15; border-radius: 14px; border: 2px solid rgba(255,255,255,.3); overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.4); cursor: pointer; }
     @media (min-width: 600px) { .local-tile { width: 140px; height: 190px; } }
-    .controls { display: flex; justify-content: center; gap: 12px; padding: 8px 12px calc(16px + var(--safe-bottom)); background: linear-gradient(to top, rgba(12,18,32,.95), transparent); }
+    .local-tile video { width: 100%; height: 100%; object-fit: cover; }
+    .tag { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.6); border-radius: 999px; padding: 5px 10px; font-size: 13px; font-weight: 600; }
+    .controls { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 12px; padding: 8px 12px calc(16px + var(--safe-bottom)); background: linear-gradient(to top, rgba(12,18,32,.9), transparent); z-index: 20; }
     .round { width: 56px; height: 56px; border-radius: 50%; border: 0; background: #1b2740; color: white; font-size: 14px; font-weight: 700; display: grid; place-items: center; cursor: pointer; }
     .round:active { transform: scale(0.94); }
     .round.off { background: #3a2a2e; color: #ffb4bc; }
@@ -65,9 +62,12 @@
     .incoming .decline { background: var(--danger); color: #2a0b10; }
     .pulse { animation: pulse 1.4s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.85; } }
-    .invite-bar { margin-top: 10px; padding: 10px 12px; background: #0f1728; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .invite-bar { margin-top: 10px; padding: 10px 12px; background: rgba(15,23,40,.9); border: 1px solid var(--line); border-radius: 12px; font-size: 13px; display: flex; align-items: center; gap: 8px; position: absolute; top: 60px; left: 12px; right: 12px; z-index: 20; }
     .invite-bar code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
     .copy-link-btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+    .swapped .remote-full { position: absolute; right: 12px; bottom: calc(90px + var(--safe-bottom)); width: 110px; height: 150px; z-index: 15; border-radius: 14px; border: 2px solid rgba(255,255,255,.3); }
+    .swapped .local-tile { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; border: 0; z-index: 5; }
+    @media (min-width: 600px) { .swapped .remote-full { width: 140px; height: 190px; } }
   </style>
 </head>
 <body>
@@ -104,11 +104,11 @@
   </div>
 
   <div id="callScreen" class="call hidden">
+    <div class="video-stage" id="videoStage"></div>
     <div class="top">
       <div class="pill" id="roomPill">Room: —</div>
       <div class="status" id="status">Connecting…</div>
     </div>
-    <div class="grid" id="videoGrid"></div>
     <div class="controls">
       <button id="micBtn" class="round" title="Mute">Mic</button>
       <button id="camBtn" class="round" title="Camera">Cam</button>
@@ -129,7 +129,7 @@
     const lobbyErr = document.getElementById('lobbyErr');
     const roomPill = document.getElementById('roomPill');
     const statusEl = document.getElementById('status');
-    const videoGrid = document.getElementById('videoGrid');
+    const videoStage = document.getElementById('videoStage');
     const micBtn = document.getElementById('micBtn');
     const camBtn = document.getElementById('camBtn');
     const endBtn = document.getElementById('endBtn');
@@ -146,6 +146,8 @@
     let ringtoneInterval = null;
     let audioCtx = null;
     let isJoinerIncoming = false;
+    let remoteVideoEl = null;
+    let localTileEl = null;
 
     const BASE_URL = 'https://nickatkinsbgky.github.io/crosscall/';
     const ICE_SERVERS = [
@@ -207,32 +209,30 @@
     }
 
     function createLocalVideo(stream) {
-      document.querySelectorAll('.local-tile').forEach(el => el.remove());
-      const tile = document.createElement('div'); tile.className = 'tile local-tile';
+      if (localTileEl) localTileEl.remove();
+      localTileEl = document.createElement('div');
+      localTileEl.className = 'local-tile';
       const v = document.createElement('video');
       v.srcObject = stream; v.muted = true; v.autoplay = true; v.playsInline = true; v.setAttribute('playsinline', '');
-      tile.appendChild(v);
+      localTileEl.appendChild(v);
       const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = myName || 'You';
-      tile.appendChild(tag);
-      document.body.appendChild(tile);
+      localTileEl.appendChild(tag);
+      videoStage.appendChild(localTileEl);
       v.play().catch(() => {});
+      localTileEl.addEventListener('click', () => videoStage.classList.toggle('swapped'));
     }
 
     function addRemoteVideo(stream, label) {
-      videoGrid.querySelectorAll('.tile:not(.local-tile)').forEach(el => el.remove());
-      const tile = document.createElement('div'); tile.className = 'tile';
-      const v = document.createElement('video');
-      v.srcObject = stream;
-      v.autoplay = true;
-      v.playsInline = true;
-      v.setAttribute('playsinline', '');
-      v.muted = false;
-      tile.appendChild(v);
-      const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = label || 'Remote';
-      tile.appendChild(tag);
-      videoGrid.appendChild(tile);
-      videoGrid.classList.add('multi');
-      const tryPlay = () => v.play().catch(() => setTimeout(tryPlay, 300));
+      if (remoteVideoEl) remoteVideoEl.remove();
+      remoteVideoEl = document.createElement('video');
+      remoteVideoEl.className = 'remote-full';
+      remoteVideoEl.srcObject = stream;
+      remoteVideoEl.autoplay = true;
+      remoteVideoEl.playsInline = true;
+      remoteVideoEl.setAttribute('playsinline', '');
+      remoteVideoEl.muted = false;
+      videoStage.appendChild(remoteVideoEl);
+      const tryPlay = () => remoteVideoEl.play().catch(() => setTimeout(tryPlay, 300));
       if (stream.getVideoTracks().length) tryPlay();
       else stream.onaddtrack = tryPlay;
     }
@@ -242,7 +242,7 @@
       if (!bar) {
         bar = document.createElement('div'); bar.id = 'inviteBar'; bar.className = 'invite-bar';
         bar.innerHTML = '<code id="inviteCode"></code><button id="copyInviteBtn" class="btn secondary copy-link-btn">Copy Link</button>';
-        document.querySelector('.top').after(bar);
+        callScreen.appendChild(bar);
         document.getElementById('copyInviteBtn').addEventListener('click', () => {
           const link = getInviteLink(roomCode);
           if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => {
@@ -342,8 +342,7 @@
     function setupCall(call) {
       currentCall = call;
       call.on('stream', remoteStream => {
-        const name = call.metadata?.name || 'Remote';
-        addRemoteVideo(remoteStream, name);
+        addRemoteVideo(remoteStream);
         statusEl.textContent = 'In call';
         stopRingtone();
         incoming.classList.add('hidden');
@@ -360,9 +359,10 @@
       if (peer) { peer.destroy(); peer = null; }
       if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
       releaseWakeLock();
-      document.querySelectorAll('.local-tile').forEach(el => el.remove());
+      if (localTileEl) { localTileEl.remove(); localTileEl = null; }
+      if (remoteVideoEl) { remoteVideoEl.remove(); remoteVideoEl = null; }
       const bar = document.getElementById('inviteBar'); if (bar) bar.remove();
-      videoGrid.innerHTML = ''; videoGrid.classList.remove('multi');
+      videoStage.classList.remove('swapped');
       incoming.classList.add('hidden');
       callScreen.classList.add('hidden');
       lobby.classList.remove('hidden');
