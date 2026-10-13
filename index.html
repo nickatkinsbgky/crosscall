@@ -521,6 +521,20 @@
       }
     })();
 
+    // Auto-start room for app users (caller) when no room param is present
+    (function autoStartForCaller() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('room')) return; // receiver or explicit join
+      // Small delay so name can load from localStorage
+      setTimeout(() => {
+        if (document.getElementById('callScreen').classList.contains('hidden')) {
+          const name = nameInput.value.trim() || 'Caller';
+          nameInput.value = name;
+          startCall(true); // auto-create room as host
+        }
+      }, 800);
+    })();
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
