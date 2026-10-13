@@ -640,9 +640,8 @@
       const favs = loadFavorites();
       if (favs.length >= 5) { alert('Maximum 5 favorites'); return; }
       // Native Android contact picker
-      if (window.Android && window.Android.pickContact) {
-        window.Android.pickContact();
-        return;
+      if (typeof Android !== "undefined" && Android.pickContact) {
+        try { Android.pickContact(); return; } catch (e) { console.error(e); }
       }
       // Web Contacts API fallback
       if (navigator.contacts && navigator.contacts.select) {
