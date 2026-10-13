@@ -132,7 +132,7 @@
       <div class="waiting-fun" id="waitingFun" style="display:none;">
         <div class="hearts">💖🎥</div>
         <div class="msg">Waiting for your darlin'…</div>
-        <div class="submsg">Share the link above</div>
+        <div class="submsg">Share the link so they can join</div>
       </div>
     </div>
     <div class="favorites-bar" id="favoritesBar"></div>
@@ -178,7 +178,7 @@
       if (name.trim()) {
         favs.push({ name: name.trim(), room: null });
         localStorage.setItem('hellodarlin-favorites', JSON.stringify(favs));
-        if (window.onContactSelected) window.onContactSelected(name);
+        if (window.onContactSelected) window.onContactSelected(name, '');
         else location.reload();
       }
     };
@@ -665,14 +665,21 @@
       }
       redraw();
     }
-    window.onContactSelected = function(name) {
+    window.onContactSelected = function(name, phone) {
       if (!name || !name.trim()) return;
       const favs = loadFavorites();
       if (favs.length >= 5) return;
-      favs.push({ name: name.trim(), room: null });
+      const room = Math.random().toString(36).slice(2, 8).toUpperCase();
+      favs.push({ name: name.trim(), room: room, phone: phone || '' });
       saveFavorites(favs);
       openFavModal();
       renderFavorites();
+      // Auto-send invite text if we have a phone number
+      if (phone && typeof Android !== 'undefined' && Android.sendSms) {
+        const link = 'https://nickatkinsbgky.github.io/crosscall/?room=' + room;
+        const msg = "Hey! Join me on HelloDarlin' for a video call: " + link;
+        Android.sendSms(phone, msg);
+      }
     };
     const favAddBtn = document.getElementById('favAddBtn'); if (favAddBtn) favAddBtn.onclick = async () => {
       const favs = loadFavorites();
