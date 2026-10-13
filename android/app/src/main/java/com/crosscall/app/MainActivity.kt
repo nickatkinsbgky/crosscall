@@ -15,7 +15,11 @@ import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
   private lateinit var webView: WebView
-  private val PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+  private val PERMISSIONS = arrayOf(
+    Manifest.permission.CAMERA,
+    Manifest.permission.RECORD_AUDIO,
+    Manifest.permission.READ_CONTACTS
+  )
   private val REQ = 100
 
   @SuppressLint("SetJavaScriptEnabled")
@@ -51,8 +55,7 @@ class MainActivity : AppCompatActivity() {
 
   override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    if (requestCode == REQ && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) loadApp()
-    else loadApp()
+    loadApp()
   }
 
   private fun loadApp() {
