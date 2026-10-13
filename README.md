@@ -1,4 +1,4 @@
-# CrossCall
+# HelloDarlin'
 
 Cross-platform video calling that works in the browser and as an installable app.
 
@@ -8,7 +8,7 @@ Cross-platform video calling that works in the browser and as an installable app
 - Service worker is included for basic offline caching and better installability
 
 ## Android App (WebView wrapper)
-A minimal Android project lives in the `android/` folder. Open it in Android Studio to build an APK that loads the CrossCall web app.
+A minimal Android project lives in the `android/` folder. Open it in Android Studio to build an APK that loads the HelloDarlin' web app.
 
 ### Build steps
 1. Open the `android/` folder in Android Studio
@@ -22,3 +22,4 @@ The app loads `https://nickatkinsbgky.github.io/crosscall/` in a full-screen Web
 - Receiver opens link in any browser (no install required)
 - Incoming call notifications (ringtone + overlay + browser notification) on both sides
 - Mobile-optimized UI with safe areas, wake lock, touch controls
+- Group video calls
