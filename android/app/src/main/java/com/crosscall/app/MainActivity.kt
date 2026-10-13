@@ -13,6 +13,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -25,7 +26,24 @@ class MainActivity : AppCompatActivity() {
     Manifest.permission.READ_CONTACTS
   )
   private val REQ = 100
-  private val CONTACT_PICK = 200
+
+  private val contactPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    if (result.resultCode == RESULT_OK && result.data != null) {
+      val uri: Uri? = result.data?.data
+      if (uri != null) {
+        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY), null, null, null)
+        cursor?.use {
+          if (it.moveToFirst()) {
+            val name = it.getString(0) ?: "Contact"
+            val quoted = org.json.JSONObject.quote(name)
+            webView.post {
+              webView.evaluateJavascript("window.onContactSelected && window.onContactSelected($quoted)", null)
+            }
+          }
+        }
+      }
+    }
+  }
 
   @SuppressLint("SetJavaScriptEnabled")
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +58,7 @@ class MainActivity : AppCompatActivity() {
       allowFileAccess = true
       mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
     }
-    webView.addJavascriptInterface(AndroidBridge(), "Android")
+    webView.addJavascriptInterface(AndroidBridge(this), "Android")
     webView.webViewClient = WebViewClient()
     webView.webChromeClient = object : WebChromeClient() {
       override fun onPermissionRequest(request: PermissionRequest) {
@@ -68,32 +86,20 @@ class MainActivity : AppCompatActivity() {
     webView.loadUrl("https://nickatkinsbgky.github.io/crosscall/")
   }
 
-  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-    super.onActivityResult(requestCode, resultCode, data)
-    if (requestCode == CONTACT_PICK && resultCode == RESULT_OK && data != null) {
-      val uri: Uri? = data.data
-      if (uri != null) {
-        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.Contacts.DISPLAY_NAME), null, null, null)
-        cursor?.use {
-          if (it.moveToFirst()) {
-            val name = it.getString(0) ?: "Contact"
-            webView.evaluateJavascript("window.onContactSelected && window.onContactSelected(" + org.json.JSONObject.quote(name) + ")", null)
-          }
-        }
-      }
-    }
-  }
-
   override fun onBackPressed() {
     if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
   }
 
-  inner class AndroidBridge {
+  class AndroidBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun pickContact() {
-      runOnUiThread {
-        val intent = Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI)
-        startActivityForResult(intent, CONTACT_PICK)
+      activity.runOnUiThread {
+        try {
+          val intent = Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI)
+          activity.contactPicker.launch(intent)
+        } catch (e: Exception) {
+          e.printStackTrace()
+        }
       }
     }
   }
