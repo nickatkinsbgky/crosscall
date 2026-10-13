@@ -81,6 +81,7 @@
       background: #122033; border: 1px solid var(--line); border-radius: 999px;
       padding: 6px 12px; font-size: 13px; color: var(--muted); max-width: 55%;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      cursor: pointer;
     }
     .grid {
       flex: 1; display: grid; gap: 8px;
@@ -151,6 +152,25 @@
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.08); opacity: 0.85; }
     }
+    .invite-bar {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #0f1728;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .invite-bar code {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+    .copy-link-btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -160,7 +180,7 @@
       <div class="logo">CC</div>
       <div>
         <h1>CrossCall</h1>
-        <p class="sub">Video calls that work on iPhone, Android, and desktop.</p>
+        <p class="sub" id="lobbySub">Video calls that work on iPhone, Android, and desktop.</p>
       </div>
     </div>
 
@@ -168,14 +188,14 @@
       <label for="name">Your name</label>
       <input id="name" type="text" placeholder="Your name" autocomplete="name" />
 
-      <label for="room">Room code</label>
+      <label for="room" id="roomLabel">Room code</label>
       <input id="room" type="text" placeholder="Leave blank to create a new room" autocomplete="off" />
 
-      <div class="row">
+      <div class="row" id="actionRow">
         <button id="createBtn" class="btn full">Create Room</button>
         <button id="joinBtn" class="btn secondary full">Join Room</button>
       </div>
-      <p class="fine">Share the room code. The host will get a ringtone and notification when someone joins.</p>
+      <p class="fine" id="lobbyFine">Create a room and share the invite link. Anyone who opens the link in a browser can join — no app needed.</p>
       <div id="lobbyErr" class="err hidden"></div>
     </div>
   </div>
@@ -197,9 +217,7 @@
       <div class="pill" id="roomPill">Room: —</div>
       <div class="status" id="status">Connecting…</div>
     </div>
-    <div class="grid" id="videoGrid">
-      <!-- remote videos go here -->
-    </div>
+    <div class="grid" id="videoGrid"></div>
     <div class="controls">
       <button id="micBtn" class="round" title="Mute">Mic</button>
       <button id="camBtn" class="round" title="Camera">Cam</button>
@@ -225,6 +243,10 @@
     const endBtn = document.getElementById('endBtn');
     const acceptBtn = document.getElementById('acceptBtn');
     const declineBtn = document.getElementById('declineBtn');
+    const lobbySub = document.getElementById('lobbySub');
+    const lobbyFine = document.getElementById('lobbyFine');
+    const roomLabel = document.getElementById('roomLabel');
+    const actionRow = document.getElementById('actionRow');
 
     let peer, localStream, currentCall, roomCode, myName, isHost = false;
     let micOn = true, camOn = true;
@@ -232,6 +254,8 @@
     let pendingCall = null;
     let ringtoneInterval = null;
     let audioCtx = null;
+
+    const BASE_URL = 'https://nickatkinsbgky.github.io/crosscall/';
 
     function showErr(msg) {
       lobbyErr.textContent = msg;
@@ -241,18 +265,21 @@
       lobbyErr.classList.add('hidden');
     }
 
+    function getInviteLink(code) {
+      return BASE_URL + '?room=' + encodeURIComponent(code);
+    }
+
     async function requestWakeLock() {
       try {
         if ('wakeLock' in navigator) {
           wakeLock = await navigator.wakeLock.request('screen');
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) {}
     }
     function releaseWakeLock() {
       if (wakeLock) { wakeLock.release(); wakeLock = null; }
     }
 
-    // Simple ringtone using Web Audio API (no external files)
     function startRingtone() {
       stopRingtone();
       try {
@@ -272,8 +299,7 @@
         };
         playTone();
         ringtoneInterval = setInterval(playTone, 1400);
-      } catch (e) { /* ignore audio errors */ }
-      // Vibrate on mobile
+      } catch (e) {}
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
     }
     function stopRingtone() {
@@ -331,7 +357,6 @@
     function addRemoteVideo(stream, label) {
       const tile = document.createElement('div');
       tile.className = 'tile';
-      tile.dataset.peer = label;
       const v = document.createElement('video');
       v.srcObject = stream;
       v.autoplay = true;
@@ -347,6 +372,29 @@
       v.play().catch(() => {});
     }
 
+    function showInviteLink(code) {
+      let bar = document.getElementById('inviteBar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'inviteBar';
+        bar.className = 'invite-bar';
+        bar.innerHTML = '<code id="inviteCode"></code><button id="copyInviteBtn" class="btn secondary copy-link-btn">Copy Link</button>';
+        document.querySelector('.top').after(bar);
+        document.getElementById('copyInviteBtn').addEventListener('click', () => {
+          const link = getInviteLink(roomCode);
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(link).then(() => {
+              const btn = document.getElementById('copyInviteBtn');
+              const orig = btn.textContent;
+              btn.textContent = 'Copied!';
+              setTimeout(() => btn.textContent = orig, 1500);
+            });
+          }
+        });
+      }
+      document.getElementById('inviteCode').textContent = getInviteLink(code);
+    }
+
     function startCall(asHost, room) {
       hideErr();
       myName = nameInput.value.trim() || 'User';
@@ -357,6 +405,8 @@
       callScreen.classList.remove('hidden');
       roomPill.textContent = 'Room: ' + roomCode;
       statusEl.textContent = asHost ? 'Waiting for someone to join…' : 'Connecting…';
+
+      if (asHost) showInviteLink(roomCode);
 
       requestWakeLock();
       if (asHost) requestNotifPermission();
@@ -378,7 +428,6 @@
         });
 
         peer.on('call', call => {
-          // Host receives incoming call — show notification UI instead of auto-answering
           pendingCall = call;
           const caller = call.metadata?.name || 'Someone';
           callerNameEl.textContent = caller + ' is calling…';
@@ -447,6 +496,8 @@
       }
       releaseWakeLock();
       document.querySelectorAll('.local-tile').forEach(el => el.remove());
+      const bar = document.getElementById('inviteBar');
+      if (bar) bar.remove();
       videoGrid.innerHTML = '';
       videoGrid.classList.remove('multi');
       incoming.classList.add('hidden');
@@ -483,18 +534,18 @@
 
     endBtn.addEventListener('click', endCall);
 
-    // Copy room code on pill click
     roomPill.addEventListener('click', () => {
       if (navigator.clipboard && roomCode) {
-        navigator.clipboard.writeText(roomCode).then(() => {
+        const link = getInviteLink(roomCode);
+        navigator.clipboard.writeText(link).then(() => {
           const orig = roomPill.textContent;
-          roomPill.textContent = 'Copied!';
+          roomPill.textContent = 'Link copied!';
           setTimeout(() => roomPill.textContent = orig, 1500);
         });
       }
     });
 
-    // Restore name if previously used
+    // Restore name
     try {
       const saved = localStorage.getItem('crosscall-name');
       if (saved) nameInput.value = saved;
@@ -502,6 +553,24 @@
     nameInput.addEventListener('change', () => {
       try { localStorage.setItem('crosscall-name', nameInput.value.trim()); } catch (e) {}
     });
+
+    // Handle invite link: ?room=CODE
+    (function handleInviteLink() {
+      const params = new URLSearchParams(window.location.search);
+      const roomFromUrl = params.get('room');
+      if (roomFromUrl) {
+        roomInput.value = roomFromUrl.trim();
+        roomInput.readOnly = true;
+        createBtn.classList.add('hidden');
+        joinBtn.textContent = 'Join Call';
+        joinBtn.classList.remove('secondary');
+        joinBtn.classList.add('full');
+        lobbySub.textContent = 'You’ve been invited to a video call.';
+        roomLabel.textContent = 'Joining room';
+        lobbyFine.textContent = 'Enter your name and tap Join Call. No app needed.';
+        setTimeout(() => nameInput.focus(), 100);
+      }
+    })();
   </script>
 </body>
 </html>
