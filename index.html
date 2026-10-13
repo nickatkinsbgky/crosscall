@@ -22,7 +22,7 @@
     .screen { min-height: 100dvh; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
     .lobby { max-width: 460px; margin: 0 auto; padding: calc(28px + var(--safe-top)) 18px calc(40px + var(--safe-bottom)); }
     .brand { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; }
-    .logo { width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(160deg, #6aa2ff, #1d4ed8); display: grid; place-items: center; font-weight: 800; font-size: 20px; }
+    .logo { width: 46px; height: 46px; border-radius: 14px; object-fit: cover; }
     h1 { margin: 0; font-size: 28px; letter-spacing: -.04em; }
     .sub { color: var(--muted); margin: 4px 0 0; font-size: 14px; line-height: 1.4; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-top: 14px; }
@@ -75,7 +75,7 @@
 <body>
   <div id="lobby" class="screen lobby">
     <div class="brand">
-      <div class="logo">HD</div>
+      <img class="logo" src="icon-192.png" alt="HelloDarlin'" />
       <div>
         <h1>HelloDarlin'</h1>
         <p class="sub" id="lobbySub">Video calls that work on iPhone, Android, and desktop.</p>
@@ -96,7 +96,7 @@
   </div>
 
   <div id="incoming" class="incoming hidden">
-    <div class="logo pulse" style="width:64px;height:64px;font-size:28px;margin-bottom:16px;">HD</div>
+    <img class="logo pulse" style="width:64px;height:64px;margin-bottom:16px;" src="icon-192.png" alt="HelloDarlin'" />
     <h2 id="incomingTitle">Incoming call</h2>
     <p class="caller" id="callerName">Someone is calling…</p>
     <div class="actions">
