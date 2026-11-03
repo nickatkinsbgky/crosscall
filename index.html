@@ -1,1 +1,54 @@
-FULL_COMPLETE_FILE
+    function startPermanentListener() {
+      const id = window.getPermanentId ? window.getPermanentId() : '';
+      if (!id || peer) return;
+      peer = new Peer(id, { debug: 1, config: { iceServers: ICE_SERVERS } });
+      peer.on('open', () => { myPeerId = id; console.log('Permanent ID online:', id); });
+      peer.on('call', call => {
+        const start = () => {
+          pendingCall = call;
+          showIncoming('Incoming call', (call.metadata?.name || 'Someone') + ' is calling…', false);
+        };
+        if (!localStream) {
+          getMedia().then(s => { localStream = s; createLocalVideo(s); start(); }).catch(() => call.close());
+        } else start();
+      });
+      peer.on('error', e => console.warn('Permanent peer', e));
+    }
+    window.startPermanentListener = startPermanentListener;
+
+    function updatePermanentUI() {
+      const id = window.getPermanentId ? window.getPermanentId() : '';
+      const d = document.getElementById('permanentLinkDisplay');
+      const i = document.getElementById('permanentIdInput');
+      if (d) d.textContent = id ? (window.getPermanentLink ? window.getPermanentLink(id) : '') : 'No permanent link set';
+      if (i && id) i.value = id;
+    }
+    window.updatePermanentUI = updatePermanentUI;
+
+    // Handle ?call= links
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const callId = params.get('call');
+      if (callId) {
+        roomInput.value = callId;
+        roomInput.readOnly = true;
+        createBtn.classList.add('hidden');
+        joinBtn.textContent = 'Call ' + callId;
+        joinBtn.classList.remove('secondary');
+        joinBtn.classList.add('full');
+        lobbySub.textContent = 'Calling ' + callId;
+        roomLabel.textContent = 'Calling';
+        lobbyFine.textContent = 'Enter your name and tap Call.';
+      }
+    })();
+
+    document.getElementById('setPermanentBtn')?.addEventListener('click', () => {
+      const id = document.getElementById('permanentIdInput').value;
+      if (window.setPermanentId) window.setPermanentId(id);
+    });
+    document.getElementById('copyPermanentBtn')?.addEventListener('click', () => {
+      const id = window.getPermanentId ? window.getPermanentId() : '';
+      if (!id) return alert('Set an ID first');
+      navigator.clipboard?.writeText(window.getPermanentLink(id)).then(() => alert('Copied!'));
+    });
+    updatePermanentUI();
