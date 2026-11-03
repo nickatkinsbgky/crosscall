@@ -53,11 +53,105 @@
   </div>
   <script src="permanent.js"></script>
   <script>
-    console.log('HelloDarlin\' lobby restored');
+    console.log('HelloDarlin\' lobby restored with freeze recovery');
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
-    // Basic wiring so buttons do something
+
+    // --- Freeze recovery (re-applied from Nov 3 fix) ---
+    let localStream = null;
+    let peer = null;
+    let activeCalls = []; // array of PeerJS call objects
+    let wakeLock = null;
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => console.log('Wake lock released'));
+        }
+      } catch (e) { console.warn('Wake lock failed', e); }
+    }
+
+    async function restartLocalMedia() {
+      try {
+        if (localStream) {
+          localStream.getTracks().forEach(t => t.stop());
+        }
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: true
+        });
+        // Update local video if present
+        const localVid = document.querySelector('#localVideo, video.local');
+        if (localVid) localVid.srcObject = localStream;
+        console.log('Local media restarted');
+        return localStream;
+      } catch (e) {
+        console.warn('restartLocalMedia failed', e);
+        return null;
+      }
+    }
+
+    async function replaceTracksInCalls(stream) {
+      if (!stream || !activeCalls.length) return;
+      for (const call of activeCalls) {
+        try {
+          const pc = call.peerConnection;
+          if (!pc) continue;
+          const senders = pc.getSenders();
+          for (const sender of senders) {
+            if (!sender.track) continue;
+            const kind = sender.track.kind;
+            const newTrack = stream.getTracks().find(t => t.kind === kind);
+            if (newTrack && newTrack.readyState === 'live') {
+              await sender.replaceTrack(newTrack);
+              console.log('Replaced', kind, 'track');
+            }
+          }
+        } catch (e) { console.warn('replaceTrack failed', e); }
+      }
+    }
+
+    window.recoverFromBackground = async function recoverFromBackground() {
+      console.log('recoverFromBackground');
+      // Re-acquire wake lock
+      requestWakeLock();
+
+      // Restart local media if tracks ended
+      let needsRestart = !localStream;
+      if (localStream) {
+        const tracks = localStream.getTracks();
+        needsRestart = tracks.some(t => t.readyState !== 'live' || t.muted);
+      }
+      if (needsRestart) {
+        const stream = await restartLocalMedia();
+        if (stream) await replaceTracksInCalls(stream);
+      } else {
+        // Even if tracks look ok, force replace in case of freeze
+        await replaceTracksInCalls(localStream);
+      }
+
+      // Resume any video elements
+      document.querySelectorAll('video').forEach(v => {
+        if (v.paused) v.play().catch(() => {});
+      });
+    };
+
+    // Listen for visibility / focus / pageshow
+    function onVisible() {
+      if (document.visibilityState === 'visible' || document.hasFocus()) {
+        setTimeout(() => window.recoverFromBackground && window.recoverFromBackground(), 150);
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    window.addEventListener('pageshow', onVisible);
+
+    // Expose for Android WebView onResume
+    window.recoverFromBackground = window.recoverFromBackground;
+
+    // Basic wiring
     document.getElementById('createBtn').addEventListener('click', () => {
       const name = document.getElementById('name').value || 'User';
       alert('Create room for ' + name + ' \u2014 full PeerJS logic will be restored next');
