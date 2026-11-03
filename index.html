@@ -1,1 +1,71 @@
-FULL_CONTENT_FROM_FILE_PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0c1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloDarlin'" />
+  <title>HelloDarlin'</title>
+  <link rel="manifest" href="manifest.json" />
+  <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+  <style>
+    .hidden { display: none !important; }
+    :root {
+      --bg: #0c1220; --card: #161e2e; --line: #2a3650; --text: #f4f7fb;
+      --muted: #9aa8be; --blue: #3d7eff; --danger: #ff5d6c; --ok: #3dd68c;
+      --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .lobby { max-width: 460px; margin: 0 auto; padding: 28px 18px; }
+    .brand { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; }
+    .logo { width: 46px; height: 46px; border-radius: 14px; }
+    h1 { margin: 0; font-size: 28px; }
+    .sub { color: var(--muted); margin: 4px 0 0; font-size: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-top: 14px; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 6px; }
+    input { width: 100%; background: #0f1728; border: 1px solid var(--line); border-radius: 12px; padding: 14px; outline: none; font-size: 16px; }
+    .btn { border: 0; border-radius: 12px; padding: 14px 16px; background: var(--blue); font-weight: 700; cursor: pointer; min-height: 48px; font-size: 16px; width: 100%; margin-top: 8px; }
+    .btn.secondary { background: #0f1728; border: 1px solid var(--line); }
+    .fine { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div id="lobby" class="lobby">
+    <div class="brand">
+      <img class="logo" src="icon-192.png" alt="HelloDarlin'" />
+      <div>
+        <h1>HelloDarlin'</h1>
+        <p class="sub" id="lobbySub">Video calls that work on iPhone, Android, and desktop.</p>
+      </div>
+    </div>
+    <div class="card">
+      <label for="name">Your name</label>
+      <input id="name" type="text" placeholder="Your name" autocomplete="name" />
+      <label for="room" id="roomLabel">Room code</label>
+      <input id="room" type="text" placeholder="Leave blank to create a new room" />
+      <button id="createBtn" class="btn">Create Room</button>
+      <button id="joinBtn" class="btn secondary">Join Room</button>
+      <p class="fine" id="lobbyFine">Create a room and share the invite link. Multiple people can join the same room for a group call.</p>
+    </div>
+  </div>
+  <script src="permanent.js"></script>
+  <script>
+    console.log('HelloDarlin\' lobby restored');
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+    // Basic wiring so buttons do something
+    document.getElementById('createBtn').addEventListener('click', () => {
+      const name = document.getElementById('name').value || 'User';
+      alert('Create room for ' + name + ' \u2014 full PeerJS logic will be restored next');
+    });
+    document.getElementById('joinBtn').addEventListener('click', () => {
+      const room = document.getElementById('room').value;
+      alert('Join ' + (room || 'new room') + ' \u2014 full logic next');
+    });
+  </script>
+</body>
+</html>
