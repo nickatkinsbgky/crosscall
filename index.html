@@ -13,8 +13,8 @@
   <style>
     .hidden { display: none !important; }
     :root {
-      --bg: #0c1220; --card: #161e2e; --line: #2a3650; --text: #f4f7fb;
-      --muted: #9aa8be; --blue: #3d7eff; --danger: #ff5d6c; --ok: #3dd68c;
+      --bg: #000000; --card: #000000; --line: #ffffff; --text: #ffffff;
+      --muted: #cccccc; --blue: #ffffff; --danger: #ffffff; --ok: #ffffff;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -25,21 +25,21 @@
     .sub { color: var(--muted); margin: 4px 0 0; font-size: 14px; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-top: 14px; }
     label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 6px; }
-    input { width: 100%; background: #0f1728; border: 1px solid var(--line); border-radius: 12px; padding: 14px; outline: none; font-size: 16px; }
-    .btn { border: 0; border-radius: 12px; padding: 14px 16px; background: var(--blue); font-weight: 700; cursor: pointer; min-height: 48px; font-size: 16px; width: 100%; margin-top: 8px; }
-    .btn.secondary { background: #0f1728; border: 1px solid var(--line); }
-    .btn.ok { background: var(--ok); color: #0b1a10; }
+    input { width: 100%; background: #000000; color: #ffffff; border: 1px solid #ffffff; border-radius: 12px; padding: 14px; outline: none; font-size: 16px; }
+    .btn { border: 0; border-radius: 12px; padding: 14px 16px; background: #ffffff; color: #000000; font-weight: 700; cursor: pointer; min-height: 48px; font-size: 16px; width: 100%; margin-top: 8px; }
+    .btn.secondary { background: #ffffff; color: #000000; border: 1px solid #ffffff; }
+    .btn.ok { background: #ffffff; color: #000000; }
     .fine { color: var(--muted); font-size: 13px; margin-top: 8px; }
-    .link-box { background: #0f1728; border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; word-break: break-all; margin-top: 8px; color: #c8d4e8; }
+    .link-box { background: #000000; border: 1px solid #ffffff; border-radius: 12px; padding: 12px; font-size: 14px; word-break: break-all; margin-top: 8px; color: #ffffff; }
     .status { font-size: 13px; color: var(--ok); margin-top: 6px; }
     .err { color: var(--danger); font-size: 13px; margin-top: 8px; }
     #callScreen { position: fixed; inset: 0; background: #000; display: none; }
     #callScreen.active { display: block; }
     #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-    #localVideo { position: absolute; right: 16px; bottom: 90px; width: 120px; height: 160px; border-radius: 16px; border: 2px solid #3d7eff; object-fit: cover; }
+    #localVideo { position: absolute; right: 16px; bottom: 90px; width: 120px; height: 160px; border-radius: 16px; border: 2px solid #ffffff; object-fit: cover; }
     .call-controls { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; gap: 16px; }
-    .round { width: 60px; height: 60px; border-radius: 50%; border: 0; font-weight: 700; cursor: pointer; }
-    .round.end { background: #ff5d6c; color: #fff; }
+    .round { width: 60px; height: 60px; border-radius: 50%; border: 0; font-weight: 700; cursor: pointer; background: #ffffff; color: #000000; }
+    .round.end { background: #ffffff; color: #000000; }
     .incoming { position: fixed; inset: 0; background: rgba(8,12,22,.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
     .incoming.show { display: flex; }
   </style>
@@ -84,8 +84,8 @@
     <h2>Incoming call</h2>
     <p id="callerName">Someone is calling…</p>
     <div style="display:flex;gap:16px;margin-top:20px;">
-      <button id="declineBtn" class="round" style="background:#3a2a2e;color:#ffb4bc;">Decline</button>
-      <button id="acceptBtn" class="round" style="background:#3dd68c;color:#0b1a10;">Accept</button>
+      <button id="declineBtn" class="round" style="background:#ffffff;color:#000000;">Decline</button>
+      <button id="acceptBtn" class="round" style="background:#ffffff;color:#000000;">Accept</button>
     </div>
   </div>
 
@@ -95,7 +95,7 @@
     <div id="waitingMessage" style="position:absolute;top:20%;left:0;right:0;text-align:center;color:#fff;font-size:18px;display:none;">
       Waiting for someone to join...<br><span style="font-size:14px;opacity:0.8;">Share your room link below</span>
     </div>
-    <div id="dedicatedLinkBox" class="link-box" style="position:absolute;bottom:100px;left:16px;right:16px;display:none;background:rgba(0,0,0,0.7);">
+    <div id="dedicatedLinkBox" class="link-box" style="position:absolute;bottom:100px;left:16px;right:16px;display:none;background:#000000;border:1px solid #ffffff;color:#ffffff;">
       <div id="dedicatedLinkText" style="word-break:break-all;margin-bottom:8px;"></div>
       <button id="copyDedicatedBtn" class="btn" style="width:auto;padding:10px 16px;">Copy Link to Share</button>
     </div>
