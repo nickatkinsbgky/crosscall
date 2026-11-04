@@ -92,6 +92,13 @@
   <div id="callScreen">
     <video id="remoteVideo" autoplay playsinline></video>
     <video id="localVideo" autoplay playsinline muted></video>
+    <div id="waitingMessage" style="position:absolute;top:20%;left:0;right:0;text-align:center;color:#fff;font-size:18px;display:none;">
+      Waiting for someone to join...<br><span style="font-size:14px;opacity:0.8;">Share your room link below</span>
+    </div>
+    <div id="dedicatedLinkBox" class="link-box" style="position:absolute;bottom:100px;left:16px;right:16px;display:none;background:rgba(0,0,0,0.7);">
+      <div id="dedicatedLinkText" style="word-break:break-all;margin-bottom:8px;"></div>
+      <button id="copyDedicatedBtn" class="btn" style="width:auto;padding:10px 16px;">Copy Link to Share</button>
+    </div>
     <div class="call-controls">
       <button id="endBtn" class="round end">End</button>
     </div>
@@ -174,7 +181,21 @@
     function hideIncoming() { document.getElementById('incoming').classList.remove('show'); }
 
     function startCallUI(remoteStream) {
-      document.getElementById('remoteVideo').srcObject = remoteStream;
+      const remoteVid = document.getElementById('remoteVideo');
+      const wait = document.getElementById('waitingMessage');
+      const linkBox = document.getElementById('dedicatedLinkBox');
+      if (remoteStream) {
+        remoteVid.srcObject = remoteStream;
+        remoteVid.style.display = '';
+        if (wait) wait.style.display = 'none';
+        // Keep link box visible so host can still share if needed, or hide after join
+        // if (linkBox) linkBox.style.display = 'none';
+      } else {
+        // Waiting for someone to join
+        remoteVid.srcObject = null;
+        remoteVid.style.display = 'none';
+        if (wait) wait.style.display = 'block';
+      }
       document.getElementById('callScreen').classList.add('active');
       document.getElementById('lobby').style.display = 'none';
       requestWakeLock();
@@ -253,6 +274,20 @@
     function roomLink(id) {
       return 'https://nickatkinsbgky.github.io/crosscall/?room=' + encodeURIComponent(id);
     }
+
+    function showDedicatedRoomLink(id) {
+      const box = document.getElementById('dedicatedLinkBox');
+      const text = document.getElementById('dedicatedLinkText');
+      const wait = document.getElementById('waitingMessage');
+      const link = roomLink(id);
+      text.textContent = link;
+      box.style.display = 'block';
+      if (wait) wait.style.display = 'block';
+      document.getElementById('copyDedicatedBtn').onclick = () => {
+        navigator.clipboard?.writeText(link).then(() => alert('Room link copied! Share it via text.'));
+      };
+    }
+
     function showRoomLink(id) {
       const d = document.getElementById('roomLinkDisplay');
       const b = document.getElementById('copyRoomBtn');
@@ -266,23 +301,31 @@
       try {
         const stream = await getMedia();
         if (roomPeer) { try { roomPeer.destroy(); } catch(e) {} }
-        roomPeer = new Peer({ config: { iceServers: ICE } });
+        // Creator uses the roomId as their Peer ID so joiners can call it.
+        // Joiner gets a random Peer ID and calls the host.
+        if (isCreator) {
+          roomPeer = new Peer(roomId, { config: { iceServers: ICE } });
+        } else {
+          roomPeer = new Peer({ config: { iceServers: ICE } });
+        }
         roomPeer.on('open', () => {
           currentRoom = roomId;
           showRoomLink(roomId);
           if (!isCreator) {
-            // joiner calls the room host (roomId is the host peer id for simplicity in this version)
             const call = roomPeer.call(roomId, stream, { metadata: { name: document.getElementById('name').value || 'Guest' } });
             activeCalls.push(call);
             call.on('stream', startCallUI);
             call.on('close', endCall);
             call.on('error', e => showErr('Call error: ' + (e.type || e.message)));
           } else {
-            // creator listens on the room id
+            // Host is in the room waiting
             roomPeer.on('call', (call) => {
               pendingCall = call;
-              showIncoming(call.metadata?.name);
+              showIncoming(call.metadata?.name || 'Someone');
             });
+            // Immediately show the call screen with waiting state + link
+            startCallUI(null); // null means waiting
+            showDedicatedRoomLink(roomId);
           }
         });
         roomPeer.on('error', e => {
@@ -344,8 +387,32 @@
       }
     })();
 
+
+    // Auto-enter dedicated room on open (if no specific call/room param)
+    (function autoDedicatedRoom() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('call') || params.get('room')) return; // handled above
+
+      let dedicatedId = localStorage.getItem('hellodarlin-dedicated-room');
+      if (!dedicatedId) {
+        // Generate a memorable dedicated room ID once
+        dedicatedId = 'room-' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('hellodarlin-dedicated-room', dedicatedId);
+      }
+      // Prefer permanent ID if user has set one
+      if (window.getPermanentId && window.getPermanentId()) {
+        dedicatedId = window.getPermanentId();
+      }
+
+      setTimeout(() => {
+        document.getElementById('room').value = dedicatedId;
+        joinOrCreateRoom(dedicatedId, true);
+      }, 800);
+    })();
+
     updatePermanentUI();
-    if (window.getPermanentId && window.getPermanentId()) {
+    // Dedicated room takes priority; permanent listener only if not in dedicated mode
+    if (window.getPermanentId && window.getPermanentId() && !localStorage.getItem("hellodarlin-dedicated-room")) {
       setTimeout(window.startPermanentListener, 300);
     }
   </script>
