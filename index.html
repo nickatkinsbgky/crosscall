@@ -29,7 +29,19 @@
     input { width: 100%; background: #0f1728; border: 1px solid var(--line); border-radius: 12px; padding: 14px; outline: none; font-size: 16px; }
     .btn { border: 0; border-radius: 12px; padding: 14px 16px; background: var(--blue); font-weight: 700; cursor: pointer; min-height: 48px; font-size: 16px; width: 100%; margin-top: 8px; }
     .btn.secondary { background: #0f1728; border: 1px solid var(--line); }
+    .btn.ok { background: var(--ok); color: #0b1a10; }
     .fine { color: var(--muted); font-size: 13px; margin-top: 8px; }
+    .link-box { background: #0f1728; border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; word-break: break-all; margin-top: 8px; color: #c8d4e8; }
+    .status { font-size: 13px; color: var(--ok); margin-top: 6px; }
+    #callScreen { position: fixed; inset: 0; background: #000; display: none; }
+    #callScreen.active { display: block; }
+    #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
+    #localVideo { position: absolute; right: 16px; bottom: 90px; width: 120px; height: 160px; border-radius: 16px; border: 2px solid #3d7eff; object-fit: cover; }
+    .call-controls { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; gap: 16px; }
+    .round { width: 60px; height: 60px; border-radius: 50%; border: 0; font-weight: 700; cursor: pointer; }
+    .round.end { background: #ff5d6c; color: #fff; }
+    .incoming { position: fixed; inset: 0; background: rgba(8,12,22,.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+    .incoming.show { display: flex; }
   </style>
 </head>
 <body>
@@ -38,128 +50,229 @@
       <img class="logo" src="icon-192.png" alt="HelloDarlin'" />
       <div>
         <h1>HelloDarlin'</h1>
-        <p class="sub" id="lobbySub">Video calls that work on iPhone, Android, and desktop.</p>
+        <p class="sub" id="lobbySub">Your personal video call link</p>
       </div>
     </div>
+
     <div class="card">
+      <label for="permanentIdInput">Your permanent ID</label>
+      <input id="permanentIdInput" type="text" placeholder="e.g. nick" autocomplete="off" />
+      <button id="setPermanentBtn" class="btn">Set My Link</button>
+      <div id="permanentLinkDisplay" class="link-box">No permanent link set</div>
+      <button id="copyPermanentBtn" class="btn secondary">Copy Link</button>
+      <div id="listenStatus" class="status hidden">Listening for calls…</div>
+      <p class="fine">Share this link. Anyone who opens it calls you directly. Keep this page open (or the app) to receive calls.</p>
+    </div>
+
+    <div class="card" id="callerCard" class="hidden">
       <label for="name">Your name</label>
       <input id="name" type="text" placeholder="Your name" autocomplete="name" />
-      <label for="room" id="roomLabel">Room code</label>
-      <input id="room" type="text" placeholder="Leave blank to create a new room" />
-      <button id="createBtn" class="btn">Create Room</button>
-      <button id="joinBtn" class="btn secondary">Join Room</button>
-      <p class="fine" id="lobbyFine">Create a room and share the invite link. Multiple people can join the same room for a group call.</p>
+      <button id="callBtn" class="btn ok">Call</button>
+      <p class="fine" id="callerFine"></p>
     </div>
   </div>
+
+  <div id="incoming" class="incoming">
+    <h2>Incoming call</h2>
+    <p id="callerName">Someone is calling…</p>
+    <div style="display:flex;gap:16px;margin-top:20px;">
+      <button id="declineBtn" class="round" style="background:#3a2a2e;color:#ffb4bc;">Decline</button>
+      <button id="acceptBtn" class="round" style="background:#3dd68c;color:#0b1a10;">Accept</button>
+    </div>
+  </div>
+
+  <div id="callScreen">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" autoplay playsinline muted></video>
+    <div class="call-controls">
+      <button id="endBtn" class="round end">End</button>
+    </div>
+  </div>
+
   <script src="permanent.js"></script>
   <script>
-    console.log('HelloDarlin\' lobby restored with freeze recovery');
+    const ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+    let localStream = null;
+    let peer = null;
+    let activeCalls = [];
+    let pendingCall = null;
+    let wakeLock = null;
+    let myName = 'User';
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 
-    // --- Freeze recovery (re-applied from Nov 3 fix) ---
-    let localStream = null;
-    let peer = null;
-    let activeCalls = []; // array of PeerJS call objects
-    let wakeLock = null;
-
+    // --- Freeze recovery ---
     async function requestWakeLock() {
       try {
-        if ('wakeLock' in navigator) {
-          wakeLock = await navigator.wakeLock.request('screen');
-          wakeLock.addEventListener('release', () => console.log('Wake lock released'));
-        }
-      } catch (e) { console.warn('Wake lock failed', e); }
+        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+      } catch (e) {}
     }
-
     async function restartLocalMedia() {
       try {
-        if (localStream) {
-          localStream.getTracks().forEach(t => t.stop());
-        }
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
-          audio: true
-        });
-        // Update local video if present
-        const localVid = document.querySelector('#localVideo, video.local');
-        if (localVid) localVid.srcObject = localStream;
-        console.log('Local media restarted');
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+        const lv = document.getElementById('localVideo');
+        if (lv) lv.srcObject = localStream;
         return localStream;
-      } catch (e) {
-        console.warn('restartLocalMedia failed', e);
-        return null;
-      }
+      } catch (e) { console.warn(e); return null; }
     }
-
     async function replaceTracksInCalls(stream) {
-      if (!stream || !activeCalls.length) return;
+      if (!stream) return;
       for (const call of activeCalls) {
         try {
           const pc = call.peerConnection;
           if (!pc) continue;
-          const senders = pc.getSenders();
-          for (const sender of senders) {
+          for (const sender of pc.getSenders()) {
             if (!sender.track) continue;
-            const kind = sender.track.kind;
-            const newTrack = stream.getTracks().find(t => t.kind === kind);
-            if (newTrack && newTrack.readyState === 'live') {
-              await sender.replaceTrack(newTrack);
-              console.log('Replaced', kind, 'track');
-            }
+            const nt = stream.getTracks().find(t => t.kind === sender.track.kind);
+            if (nt && nt.readyState === 'live') await sender.replaceTrack(nt);
           }
-        } catch (e) { console.warn('replaceTrack failed', e); }
+        } catch (e) {}
       }
     }
-
-    window.recoverFromBackground = async function recoverFromBackground() {
-      console.log('recoverFromBackground');
-      // Re-acquire wake lock
+    window.recoverFromBackground = async function() {
       requestWakeLock();
-
-      // Restart local media if tracks ended
-      let needsRestart = !localStream;
-      if (localStream) {
-        const tracks = localStream.getTracks();
-        needsRestart = tracks.some(t => t.readyState !== 'live' || t.muted);
-      }
-      if (needsRestart) {
-        const stream = await restartLocalMedia();
-        if (stream) await replaceTracksInCalls(stream);
+      let needs = !localStream;
+      if (localStream) needs = localStream.getTracks().some(t => t.readyState !== 'live');
+      if (needs) {
+        const s = await restartLocalMedia();
+        if (s) await replaceTracksInCalls(s);
       } else {
-        // Even if tracks look ok, force replace in case of freeze
         await replaceTracksInCalls(localStream);
       }
-
-      // Resume any video elements
-      document.querySelectorAll('video').forEach(v => {
-        if (v.paused) v.play().catch(() => {});
-      });
+      document.querySelectorAll('video').forEach(v => { if (v.paused) v.play().catch(()=>{}); });
     };
-
-    // Listen for visibility / focus / pageshow
     function onVisible() {
-      if (document.visibilityState === 'visible' || document.hasFocus()) {
-        setTimeout(() => window.recoverFromBackground && window.recoverFromBackground(), 150);
-      }
+      if (document.visibilityState === 'visible') setTimeout(() => window.recoverFromBackground && window.recoverFromBackground(), 150);
     }
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     window.addEventListener('pageshow', onVisible);
 
-    // Expose for Android WebView onResume
-    window.recoverFromBackground = window.recoverFromBackground;
+    // --- Permanent personal listener ---
+    function showIncoming(title, name) {
+      document.getElementById('callerName').textContent = name || 'Someone is calling…';
+      document.getElementById('incoming').classList.add('show');
+    }
+    function hideIncoming() {
+      document.getElementById('incoming').classList.remove('show');
+    }
 
-    // Basic wiring
-    document.getElementById('createBtn').addEventListener('click', () => {
-      const name = document.getElementById('name').value || 'User';
-      alert('Create room for ' + name + ' \u2014 full PeerJS logic will be restored next');
+    async function getMedia() {
+      if (localStream && localStream.getTracks().some(t => t.readyState === 'live')) return localStream;
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      document.getElementById('localVideo').srcObject = localStream;
+      return localStream;
+    }
+
+    window.startPermanentListener = function startPermanentListener() {
+      const id = window.getPermanentId ? window.getPermanentId() : '';
+      if (!id) return;
+      if (peer) { try { peer.destroy(); } catch(e) {} }
+      peer = new Peer(id, { debug: 0, config: { iceServers: ICE } });
+      peer.on('open', () => {
+        document.getElementById('listenStatus').classList.remove('hidden');
+        document.getElementById('listenStatus').textContent = 'Listening for calls as ' + id;
+        console.log('Permanent ID online:', id);
+      });
+      peer.on('call', async (call) => {
+        pendingCall = call;
+        const name = call.metadata?.name || 'Someone';
+        showIncoming('Incoming call', name + ' is calling…');
+      });
+      peer.on('error', e => console.warn('Permanent peer', e));
+    };
+
+    function updatePermanentUI() {
+      const id = window.getPermanentId ? window.getPermanentId() : '';
+      const d = document.getElementById('permanentLinkDisplay');
+      const i = document.getElementById('permanentIdInput');
+      if (d) d.textContent = id ? (window.getPermanentLink ? window.getPermanentLink(id) : '') : 'No permanent link set';
+      if (i && id) i.value = id;
+    }
+    window.updatePermanentUI = updatePermanentUI;
+
+    // Accept / Decline
+    document.getElementById('acceptBtn').addEventListener('click', async () => {
+      if (!pendingCall) return;
+      hideIncoming();
+      try {
+        const stream = await getMedia();
+        pendingCall.answer(stream);
+        activeCalls.push(pendingCall);
+        pendingCall.on('stream', remote => {
+          document.getElementById('remoteVideo').srcObject = remote;
+          document.getElementById('callScreen').classList.add('active');
+          document.getElementById('lobby').style.display = 'none';
+          requestWakeLock();
+        });
+        pendingCall.on('close', endCall);
+      } catch (e) { alert('Could not start media: ' + e.message); }
+      pendingCall = null;
     });
-    document.getElementById('joinBtn').addEventListener('click', () => {
-      const room = document.getElementById('room').value;
-      alert('Join ' + (room || 'new room') + ' \u2014 full logic next');
+    document.getElementById('declineBtn').addEventListener('click', () => {
+      if (pendingCall) { try { pendingCall.close(); } catch(e) {} }
+      pendingCall = null;
+      hideIncoming();
     });
+
+    function endCall() {
+      activeCalls.forEach(c => { try { c.close(); } catch(e) {} });
+      activeCalls = [];
+      document.getElementById('callScreen').classList.remove('active');
+      document.getElementById('lobby').style.display = '';
+      document.getElementById('remoteVideo').srcObject = null;
+    }
+    document.getElementById('endBtn').addEventListener('click', endCall);
+
+    // Set / Copy permanent
+    document.getElementById('setPermanentBtn').addEventListener('click', () => {
+      const id = document.getElementById('permanentIdInput').value;
+      if (window.setPermanentId) window.setPermanentId(id);
+    });
+    document.getElementById('copyPermanentBtn').addEventListener('click', () => {
+      const id = window.getPermanentId ? window.getPermanentId() : '';
+      if (!id) return alert('Set an ID first');
+      const link = window.getPermanentLink(id);
+      navigator.clipboard?.writeText(link).then(() => alert('Copied!'));
+    });
+
+    // Handle ?call= links (visitor is calling the permanent ID)
+    (function handleCallParam() {
+      const params = new URLSearchParams(window.location.search);
+      const callId = params.get('call');
+      if (!callId) return;
+      document.getElementById('callerCard').classList.remove('hidden');
+      document.getElementById('callerFine').textContent = 'You are calling ' + callId;
+      document.getElementById('callBtn').textContent = 'Call ' + callId;
+      document.getElementById('callBtn').onclick = async () => {
+        myName = document.getElementById('name').value || 'Caller';
+        try {
+          const stream = await getMedia();
+          const callerPeer = new Peer({ config: { iceServers: ICE } });
+          callerPeer.on('open', () => {
+            const call = callerPeer.call(callId, stream, { metadata: { name: myName } });
+            activeCalls.push(call);
+            call.on('stream', remote => {
+              document.getElementById('remoteVideo').srcObject = remote;
+              document.getElementById('callScreen').classList.add('active');
+              document.getElementById('lobby').style.display = 'none';
+              requestWakeLock();
+            });
+            call.on('close', endCall);
+          });
+          callerPeer.on('error', e => alert('Call failed: ' + (e.message || e.type)));
+        } catch (e) { alert('Media error: ' + e.message); }
+      };
+    })();
+
+    updatePermanentUI();
+    // Auto-start listener if ID already set
+    if (window.getPermanentId && window.getPermanentId()) {
+      setTimeout(window.startPermanentListener, 300);
+    }
   </script>
 </body>
 </html>
