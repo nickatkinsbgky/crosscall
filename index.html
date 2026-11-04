@@ -15,7 +15,6 @@
     :root {
       --bg: #0c1220; --card: #161e2e; --line: #2a3650; --text: #f4f7fb;
       --muted: #9aa8be; --blue: #3d7eff; --danger: #ff5d6c; --ok: #3dd68c;
-      --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -33,6 +32,7 @@
     .fine { color: var(--muted); font-size: 13px; margin-top: 8px; }
     .link-box { background: #0f1728; border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; word-break: break-all; margin-top: 8px; color: #c8d4e8; }
     .status { font-size: 13px; color: var(--ok); margin-top: 6px; }
+    .err { color: var(--danger); font-size: 13px; margin-top: 8px; }
     #callScreen { position: fixed; inset: 0; background: #000; display: none; }
     #callScreen.active { display: block; }
     #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
@@ -50,25 +50,33 @@
       <img class="logo" src="icon-192.png" alt="HelloDarlin'" />
       <div>
         <h1>HelloDarlin'</h1>
-        <p class="sub" id="lobbySub">Your personal video call link</p>
+        <p class="sub">Video calls — personal link or room invite</p>
       </div>
     </div>
 
+    <!-- Permanent personal link -->
     <div class="card">
-      <label for="permanentIdInput">Your permanent ID</label>
+      <label for="permanentIdInput">Your permanent ID (direct call link)</label>
       <input id="permanentIdInput" type="text" placeholder="e.g. nick" autocomplete="off" />
       <button id="setPermanentBtn" class="btn">Set My Link</button>
       <div id="permanentLinkDisplay" class="link-box">No permanent link set</div>
-      <button id="copyPermanentBtn" class="btn secondary">Copy Link</button>
+      <button id="copyPermanentBtn" class="btn secondary">Copy Personal Link</button>
       <div id="listenStatus" class="status hidden">Listening for calls…</div>
-      <p class="fine">Share this link. Anyone who opens it calls you directly. Keep this page open (or the app) to receive calls.</p>
+      <p class="fine">Anyone with this link can call you directly. Keep this page open to receive calls.</p>
     </div>
 
-    <div class="card" id="callerCard" class="hidden">
+    <!-- Room invite -->
+    <div class="card">
       <label for="name">Your name</label>
       <input id="name" type="text" placeholder="Your name" autocomplete="name" />
-      <button id="callBtn" class="btn ok">Call</button>
-      <p class="fine" id="callerFine"></p>
+      <label for="room">Room code</label>
+      <input id="room" type="text" placeholder="Leave blank to create a new room" />
+      <button id="createBtn" class="btn">Create Room & Get Invite Link</button>
+      <button id="joinBtn" class="btn secondary">Join Room</button>
+      <div id="roomLinkDisplay" class="link-box hidden"></div>
+      <button id="copyRoomBtn" class="btn secondary hidden">Copy Room Invite</button>
+      <p class="fine">Create a room and share the invite link. Anyone who opens it joins the same call.</p>
+      <div id="lobbyErr" class="err hidden"></div>
     </div>
   </div>
 
@@ -91,23 +99,34 @@
 
   <script src="permanent.js"></script>
   <script>
-    const ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+    const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
     let localStream = null;
     let peer = null;
+    let roomPeer = null;
     let activeCalls = [];
     let pendingCall = null;
     let wakeLock = null;
-    let myName = 'User';
+    let currentRoom = null;
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 
-    // --- Freeze recovery ---
+    function showErr(msg) {
+      const e = document.getElementById('lobbyErr');
+      e.textContent = msg;
+      e.classList.remove('hidden');
+      setTimeout(() => e.classList.add('hidden'), 8000);
+    }
+
     async function requestWakeLock() {
-      try {
-        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
-      } catch (e) {}
+      try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+    }
+    async function getMedia() {
+      if (localStream && localStream.getTracks().some(t => t.readyState === 'live')) return localStream;
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      document.getElementById('localVideo').srcObject = localStream;
+      return localStream;
     }
     async function restartLocalMedia() {
       try {
@@ -116,7 +135,7 @@
         const lv = document.getElementById('localVideo');
         if (lv) lv.srcObject = localStream;
         return localStream;
-      } catch (e) { console.warn(e); return null; }
+      } catch (e) { return null; }
     }
     async function replaceTracksInCalls(stream) {
       if (!stream) return;
@@ -144,45 +163,49 @@
       }
       document.querySelectorAll('video').forEach(v => { if (v.paused) v.play().catch(()=>{}); });
     };
-    function onVisible() {
-      if (document.visibilityState === 'visible') setTimeout(() => window.recoverFromBackground && window.recoverFromBackground(), 150);
-    }
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-    window.addEventListener('pageshow', onVisible);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(window.recoverFromBackground, 150); });
+    window.addEventListener('focus', () => setTimeout(window.recoverFromBackground, 150));
+    window.addEventListener('pageshow', () => setTimeout(window.recoverFromBackground, 150));
 
-    // --- Permanent personal listener ---
-    function showIncoming(title, name) {
-      document.getElementById('callerName').textContent = name || 'Someone is calling…';
+    function showIncoming(name) {
+      document.getElementById('callerName').textContent = (name || 'Someone') + ' is calling…';
       document.getElementById('incoming').classList.add('show');
     }
-    function hideIncoming() {
-      document.getElementById('incoming').classList.remove('show');
+    function hideIncoming() { document.getElementById('incoming').classList.remove('show'); }
+
+    function startCallUI(remoteStream) {
+      document.getElementById('remoteVideo').srcObject = remoteStream;
+      document.getElementById('callScreen').classList.add('active');
+      document.getElementById('lobby').style.display = 'none';
+      requestWakeLock();
+    }
+    function endCall() {
+      activeCalls.forEach(c => { try { c.close(); } catch(e) {} });
+      activeCalls = [];
+      document.getElementById('callScreen').classList.remove('active');
+      document.getElementById('lobby').style.display = '';
+      document.getElementById('remoteVideo').srcObject = null;
     }
 
-    async function getMedia() {
-      if (localStream && localStream.getTracks().some(t => t.readyState === 'live')) return localStream;
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      document.getElementById('localVideo').srcObject = localStream;
-      return localStream;
-    }
-
-    window.startPermanentListener = function startPermanentListener() {
+    // --- Permanent personal listener ---
+    window.startPermanentListener = function() {
       const id = window.getPermanentId ? window.getPermanentId() : '';
       if (!id) return;
       if (peer) { try { peer.destroy(); } catch(e) {} }
       peer = new Peer(id, { debug: 0, config: { iceServers: ICE } });
       peer.on('open', () => {
         document.getElementById('listenStatus').classList.remove('hidden');
-        document.getElementById('listenStatus').textContent = 'Listening for calls as ' + id;
-        console.log('Permanent ID online:', id);
+        document.getElementById('listenStatus').textContent = 'Listening for direct calls as ' + id;
       });
-      peer.on('call', async (call) => {
+      peer.on('call', (call) => {
         pendingCall = call;
-        const name = call.metadata?.name || 'Someone';
-        showIncoming('Incoming call', name + ' is calling…');
+        showIncoming(call.metadata?.name);
       });
-      peer.on('error', e => console.warn('Permanent peer', e));
+      peer.on('error', e => {
+        console.warn('Permanent peer error', e);
+        if (e.type === 'unavailable-id') showErr('That permanent ID is already in use. Choose a different one.');
+        else if (e.type === 'peer-unavailable') showErr('Could not reach the call server. Try again in a moment.');
+      });
     };
 
     function updatePermanentUI() {
@@ -194,7 +217,6 @@
     }
     window.updatePermanentUI = updatePermanentUI;
 
-    // Accept / Decline
     document.getElementById('acceptBtn').addEventListener('click', async () => {
       if (!pendingCall) return;
       hideIncoming();
@@ -202,14 +224,9 @@
         const stream = await getMedia();
         pendingCall.answer(stream);
         activeCalls.push(pendingCall);
-        pendingCall.on('stream', remote => {
-          document.getElementById('remoteVideo').srcObject = remote;
-          document.getElementById('callScreen').classList.add('active');
-          document.getElementById('lobby').style.display = 'none';
-          requestWakeLock();
-        });
+        pendingCall.on('stream', startCallUI);
         pendingCall.on('close', endCall);
-      } catch (e) { alert('Could not start media: ' + e.message); }
+      } catch (e) { showErr('Could not start camera/mic: ' + e.message); }
       pendingCall = null;
     });
     document.getElementById('declineBtn').addEventListener('click', () => {
@@ -217,59 +234,117 @@
       pendingCall = null;
       hideIncoming();
     });
-
-    function endCall() {
-      activeCalls.forEach(c => { try { c.close(); } catch(e) {} });
-      activeCalls = [];
-      document.getElementById('callScreen').classList.remove('active');
-      document.getElementById('lobby').style.display = '';
-      document.getElementById('remoteVideo').srcObject = null;
-    }
     document.getElementById('endBtn').addEventListener('click', endCall);
 
-    // Set / Copy permanent
     document.getElementById('setPermanentBtn').addEventListener('click', () => {
       const id = document.getElementById('permanentIdInput').value;
       if (window.setPermanentId) window.setPermanentId(id);
     });
     document.getElementById('copyPermanentBtn').addEventListener('click', () => {
       const id = window.getPermanentId ? window.getPermanentId() : '';
-      if (!id) return alert('Set an ID first');
-      const link = window.getPermanentLink(id);
-      navigator.clipboard?.writeText(link).then(() => alert('Copied!'));
+      if (!id) return showErr('Set an ID first');
+      navigator.clipboard?.writeText(window.getPermanentLink(id)).then(() => alert('Personal link copied!'));
     });
 
-    // Handle ?call= links (visitor is calling the permanent ID)
-    (function handleCallParam() {
+    // --- Room invite system ---
+    function makeRoomId() {
+      return Math.random().toString(36).slice(2, 8);
+    }
+    function roomLink(id) {
+      return 'https://nickatkinsbgky.github.io/crosscall/?room=' + encodeURIComponent(id);
+    }
+    function showRoomLink(id) {
+      const d = document.getElementById('roomLinkDisplay');
+      const b = document.getElementById('copyRoomBtn');
+      d.textContent = roomLink(id);
+      d.classList.remove('hidden');
+      b.classList.remove('hidden');
+      b.onclick = () => navigator.clipboard?.writeText(roomLink(id)).then(() => alert('Room invite copied!'));
+    }
+
+    async function joinOrCreateRoom(roomId, isCreator) {
+      try {
+        const stream = await getMedia();
+        if (roomPeer) { try { roomPeer.destroy(); } catch(e) {} }
+        roomPeer = new Peer({ config: { iceServers: ICE } });
+        roomPeer.on('open', () => {
+          currentRoom = roomId;
+          showRoomLink(roomId);
+          if (!isCreator) {
+            // joiner calls the room host (roomId is the host peer id for simplicity in this version)
+            const call = roomPeer.call(roomId, stream, { metadata: { name: document.getElementById('name').value || 'Guest' } });
+            activeCalls.push(call);
+            call.on('stream', startCallUI);
+            call.on('close', endCall);
+            call.on('error', e => showErr('Call error: ' + (e.type || e.message)));
+          } else {
+            // creator listens on the room id
+            roomPeer.on('call', (call) => {
+              pendingCall = call;
+              showIncoming(call.metadata?.name);
+            });
+          }
+        });
+        roomPeer.on('error', e => {
+          if (e.type === 'peer-unavailable') showErr('The room host is not online. Ask them to open the app and try again.');
+          else showErr('Room connection failed: ' + (e.type || e.message || 'unknown'));
+        });
+      } catch (e) {
+        showErr('Camera/mic error: ' + e.message);
+      }
+    }
+
+    document.getElementById('createBtn').addEventListener('click', () => {
+      const roomId = document.getElementById('room').value.trim() || makeRoomId();
+      document.getElementById('room').value = roomId;
+      joinOrCreateRoom(roomId, true);
+    });
+    document.getElementById('joinBtn').addEventListener('click', () => {
+      const roomId = document.getElementById('room').value.trim();
+      if (!roomId) return showErr('Enter a room code');
+      joinOrCreateRoom(roomId, false);
+    });
+
+    // Handle URL params
+    (function handleParams() {
       const params = new URLSearchParams(window.location.search);
       const callId = params.get('call');
-      if (!callId) return;
-      document.getElementById('callerCard').classList.remove('hidden');
-      document.getElementById('callerFine').textContent = 'You are calling ' + callId;
-      document.getElementById('callBtn').textContent = 'Call ' + callId;
-      document.getElementById('callBtn').onclick = async () => {
-        myName = document.getElementById('name').value || 'Caller';
-        try {
-          const stream = await getMedia();
-          const callerPeer = new Peer({ config: { iceServers: ICE } });
-          callerPeer.on('open', () => {
-            const call = callerPeer.call(callId, stream, { metadata: { name: myName } });
-            activeCalls.push(call);
-            call.on('stream', remote => {
-              document.getElementById('remoteVideo').srcObject = remote;
-              document.getElementById('callScreen').classList.add('active');
-              document.getElementById('lobby').style.display = 'none';
-              requestWakeLock();
+      const roomId = params.get('room');
+
+      if (callId) {
+        document.getElementById('room').value = callId;
+        document.getElementById('joinBtn').textContent = 'Call ' + callId;
+        document.getElementById('joinBtn').classList.remove('secondary');
+        document.getElementById('joinBtn').classList.add('ok');
+        document.getElementById('createBtn').classList.add('hidden');
+        document.getElementById('joinBtn').onclick = async () => {
+          try {
+            const stream = await getMedia();
+            const callerPeer = new Peer({ config: { iceServers: ICE } });
+            callerPeer.on('open', () => {
+              const call = callerPeer.call(callId, stream, { metadata: { name: document.getElementById('name').value || 'Caller' } });
+              activeCalls.push(call);
+              call.on('stream', startCallUI);
+              call.on('close', endCall);
+              call.on('error', e => showErr('Call failed: ' + (e.type || e.message)));
             });
-            call.on('close', endCall);
-          });
-          callerPeer.on('error', e => alert('Call failed: ' + (e.message || e.type)));
-        } catch (e) { alert('Media error: ' + e.message); }
-      };
+            callerPeer.on('error', e => {
+              if (e.type === 'peer-unavailable') showErr('They are not online right now. Ask them to open HelloDarlin\' and try again.');
+              else showErr('Call failed: ' + (e.type || e.message || 'could not connect'));
+            });
+          } catch (e) { showErr('Camera/mic error: ' + e.message); }
+        };
+      }
+
+      if (roomId) {
+        document.getElementById('room').value = roomId;
+        document.getElementById('joinBtn').textContent = 'Join Room ' + roomId;
+        document.getElementById('createBtn').classList.add('hidden');
+        setTimeout(() => document.getElementById('joinBtn').click(), 500);
+      }
     })();
 
     updatePermanentUI();
-    // Auto-start listener if ID already set
     if (window.getPermanentId && window.getPermanentId()) {
       setTimeout(window.startPermanentListener, 300);
     }
