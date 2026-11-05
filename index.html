@@ -191,6 +191,7 @@
       <button id="copyDedicatedBtn" class="btn" style="width:auto;padding:8px 14px;font-size:13px;">Copy Link</button>
     </div>
     <div class="call-controls">
+      <button id="flipBtn" class="round" title="Switch camera">↻</button>
       <button id="endBtn" class="round end">End</button>
     </div>
   </div>
@@ -223,9 +224,61 @@
     }
     async function getMedia() {
       if (localStream && localStream.getTracks().some(t => t.readyState === 'live')) return localStream;
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing }, audio: true });
       document.getElementById('localVideo').srcObject = localStream;
       return localStream;
+    }
+
+    let currentFacing = 'user'; // 'user' = front, 'environment' = rear
+
+    async function flipCamera() {
+      const newFacing = currentFacing === 'user' ? 'environment' : 'user';
+      try {
+        // Stop old video tracks
+        if (localStream) {
+          localStream.getVideoTracks().forEach(t => t.stop());
+        }
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: newFacing },
+          audio: false
+        });
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        if (!newVideoTrack) throw new Error('No video track from new camera');
+
+        // Replace in local stream
+        if (localStream) {
+          const oldVideo = localStream.getVideoTracks()[0];
+          if (oldVideo) localStream.removeTrack(oldVideo);
+          localStream.addTrack(newVideoTrack);
+        } else {
+          localStream = newStream;
+        }
+        document.getElementById('localVideo').srcObject = localStream;
+        currentFacing = newFacing;
+
+        // Replace track in all active PeerJS calls
+        for (const call of activeCalls) {
+          try {
+            const pc = call.peerConnection;
+            if (!pc) continue;
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) await sender.replaceTrack(newVideoTrack);
+          } catch (e) { console.warn('replaceTrack failed', e); }
+        }
+        console.log('Switched to', currentFacing, 'camera');
+      } catch (e) {
+        showErr('Could not switch camera: ' + (e.message || 'device may not support it'));
+        // try to restore previous
+        try {
+          const restore = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing }, audio: false });
+          const vt = restore.getVideoTracks()[0];
+          if (vt && localStream) {
+            localStream.getVideoTracks().forEach(t => { if (t !== vt) t.stop(); localStream.removeTrack(t); });
+            localStream.addTrack(vt);
+            document.getElementById('localVideo').srcObject = localStream;
+          }
+        } catch (_) {}
+      }
     }
     async function restartLocalMedia() {
       try {
@@ -353,6 +406,7 @@
       hideIncoming();
     });
     document.getElementById('endBtn').addEventListener('click', endCall);
+    document.getElementById('flipBtn')?.addEventListener('click', flipCamera);
 
     document.getElementById('setPermanentBtn').addEventListener('click', () => {
       const id = document.getElementById('permanentIdInput').value;
