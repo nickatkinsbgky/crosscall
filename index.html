@@ -410,39 +410,73 @@
 
     async function joinOrCreateRoom(roomId, isCreator) {
       try {
+        if (typeof Peer === 'undefined') {
+          showErr('Call library still loading. Please try again in a moment.');
+          return;
+        }
         const stream = await getMedia();
         if (roomPeer) {
           try { roomPeer.destroy(); } catch(e) {}
           roomPeer = null;
-          await new Promise(r => setTimeout(r, 800)); // allow ID release
+          await new Promise(r => setTimeout(r, 1200)); // allow ID release
         }
+        const opts = { config: { iceServers: ICE }, debug: 1 };
         if (isCreator) {
-          roomPeer = new Peer(roomId, { config: { iceServers: ICE } });
+          roomPeer = new Peer(roomId, opts);
         } else {
-          roomPeer = new Peer({ config: { iceServers: ICE } });
+          roomPeer = new Peer(opts);
         }
+
+        let joined = false;
+        const tryJoin = (attempt) => {
+          if (joined || isCreator) return;
+          if (attempt > 4) {
+            showErr('The room host is not online. Ask them to open the app and try again.');
+            return;
+          }
+          console.log('Join attempt', attempt, 'to room', roomId);
+          const call = roomPeer.call(roomId, stream, { metadata: { name: document.getElementById('name').value || 'Guest' } });
+          activeCalls.push(call);
+          call.on('stream', (s) => { joined = true; startCallUI(s); });
+          call.on('close', endCall);
+          call.on('error', (e) => {
+            console.warn('Call error', e);
+            if (e.type === 'peer-unavailable' && attempt < 4) {
+              setTimeout(() => tryJoin(attempt + 1), 1500);
+            } else if (!joined) {
+              showErr('Call error: ' + (e.type || e.message || 'failed'));
+            }
+          });
+        };
+
         roomPeer.on('open', () => {
+          console.log('Peer open as', roomPeer.id, 'for room', roomId, 'creator=', isCreator);
           currentRoom = roomId;
           showRoomLink(roomId);
-          if (!isCreator) {
-            const call = roomPeer.call(roomId, stream, { metadata: { name: document.getElementById('name').value || 'Guest' } });
-            activeCalls.push(call);
-            call.on('stream', startCallUI);
-            call.on('close', endCall);
-            call.on('error', e => showErr('Call error: ' + (e.type || e.message)));
-          } else {
+          if (isCreator) {
             roomPeer.on('call', (call) => {
               pendingCall = call;
               showIncoming(call.metadata?.name || 'Someone');
             });
             startCallUI(null);
             showDedicatedRoomLink(roomId);
+          } else {
+            tryJoin(1);
           }
         });
         roomPeer.on('error', e => {
-          if (e.type === 'peer-unavailable') showErr('The room host is not online. Ask them to open the app and try again.');
-          else if (e.type === 'unavailable-id') showErr('Room ID is temporarily unavailable. Try again in a moment.');
-          else showErr('Room connection failed: ' + (e.type || e.message || 'unknown'));
+          console.warn('roomPeer error', e);
+          if (e.type === 'peer-unavailable') {
+            if (!isCreator) showErr('The room host is not online. Ask them to open the app and try again.');
+          } else if (e.type === 'unavailable-id') {
+            showErr('Room ID is temporarily unavailable. Try again in a moment.');
+          } else {
+            showErr('Room connection failed: ' + (e.type || e.message || 'unknown'));
+          }
+        });
+        roomPeer.on('disconnected', () => {
+          console.warn('roomPeer disconnected, attempting reconnect');
+          try { roomPeer.reconnect(); } catch(e) {}
         });
       } catch (e) {
         showErr('Camera/mic error: ' + e.message);
